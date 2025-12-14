@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TaskPool - 云端任务管理系统</title>
+    <title>任务池</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
@@ -139,45 +139,26 @@
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
     <div class="container mx-auto px-4 py-8 max-w-4xl">
         <!-- 应用标题 -->
-        <header class="text-center mb-8 animate-fade-in">
-            <div class="flex items-center justify-center space-x-3 mb-3">
-                <div class="w-12 h-12 bg-gradient-to-r from-primary to-purple-500 rounded-lg flex items-center justify-center shadow-lg">
-                    <i class="fa fa-tasks text-white text-2xl"></i>
+        <header class="text-center mb-6 animate-fade-in">
+            <div class="flex items-center justify-center space-x-3 mb-2">
+                <div class="w-10 h-10 bg-gradient-to-r from-primary to-purple-500 rounded-lg flex items-center justify-center shadow-lg">
+                    <i class="fa fa-tasks text-white text-xl"></i>
                 </div>
-                <h1 class="text-4xl md:text-5xl font-bold gradient-text text-shadow">TaskPool</h1>
+                <h1 class="text-3xl md:text-4xl font-bold text-gray-800">任务池</h1>
             </div>
-            <p class="text-xl text-gray-600">云端任务管理系统 - 随时随地管理您的任务</p>
         </header>
 
-        <!-- 用户信息和同步状态 -->
+        <!-- 同步状态 -->
         <div class="bg-white rounded-2xl shadow-lg p-4 mb-6 animate-fade-in">
-            <div class="flex flex-col md:flex-row justify-between items-center">
-                <div class="flex items-center space-x-3 mb-3 md:mb-0">
-                    <div class="w-10 h-10 bg-gradient-to-r from-primary to-purple-500 rounded-full flex items-center justify-center text-white font-semibold">
-                        <span id="userAvatar">用</span>
-                    </div>
-                    <div>
-                        <p class="font-medium text-gray-800" id="userName">用户</p>
-                        <p class="text-sm text-gray-500" id="syncStatus">
-                            <i class="fa fa-cloud"></i> 云端同步
-                        </p>
+            <div class="flex justify-between items-center">
+                <div class="flex items-center space-x-3">
+                    <div class="text-sm text-gray-500" id="syncStatus">
+                        <i class="fa fa-cloud"></i> 云端同步
                     </div>
                 </div>
                 <div class="flex items-center space-x-3">
                     <div id="syncIndicator" class="sync-indicator cursor-pointer" title="点击同步">
                         <i class="fa fa-refresh"></i>
-                    </div>
-                    <button id="authBtn" class="px-4 py-2 bg-primary hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors">
-                        <i class="fa fa-user-circle mr-1"></i>
-                        登录/注册
-                    </button>
-                    <div class="flex space-x-1">
-                        <button id="wechatSignInBtn" class="w-8 h-8 bg-green-500 hover:bg-green-600 text-white rounded-lg flex items-center justify-center transition-colors" title="使用微信登录">
-                            <i class="fa fa-weixin"></i>
-                        </button>
-                        <button id="phoneSignInBtn" class="w-8 h-8 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center justify-center transition-colors" title="使用手机号登录">
-                            <i class="fa fa-mobile"></i>
-                        </button>
                     </div>
                 </div>
             </div>
@@ -261,14 +242,14 @@
         </div>
 
         <!-- 任务提醒组件 -->
-        <div id="taskReminder" class="bg-white rounded-2xl shadow-lg p-6 mb-6 border-l-4 border-warning animate-fade-in">
-            <div class="flex items-center space-x-3 mb-4">
+        <div id="taskReminder" class="bg-white rounded-lg shadow p-4 mb-4 border-l-4 border-warning animate-fade-in">
+            <div class="flex items-center space-x-2 mb-3">
                 <div class="text-warning">
-                    <i class="fa fa-bell text-2xl"></i>
+                    <i class="fa fa-bell text-xl"></i>
                 </div>
-                <h3 class="text-xl font-bold text-gray-800">任务提醒</h3>
+                <h3 class="text-lg font-semibold text-gray-800">任务提醒</h3>
             </div>
-            <ul class="text-gray-600 space-y-2" id="reminderList">
+            <ul class="text-gray-600 space-y-1" id="reminderList">
                 <!-- 提醒项将动态生成 -->
             </ul>
         </div>
@@ -350,15 +331,15 @@
         </div>
 
         <!-- 任务列表 -->
-        <div class="bg-white rounded-2xl shadow-lg p-6 animate-fade-in">
+        <div class="bg-white rounded-lg shadow p-4 animate-fade-in">
             <div id="tasksContainer">
                 <!-- 空状态 -->
-                <div id="emptyState" class="text-center py-12">
-                    <div class="w-20 h-20 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                        <i class="fa fa-tasks text-gray-400 text-3xl"></i>
+                <div id="emptyState" class="text-center py-8">
+                    <div class="w-16 h-16 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-3">
+                        <i class="fa fa-tasks text-gray-400 text-2xl"></i>
                     </div>
-                    <h3 class="text-xl font-semibold text-gray-600 mb-2">暂无任务</h3>
-                    <p class="text-gray-500">开始添加您的第一个任务吧！</p>
+                    <h3 class="text-base font-semibold text-gray-600 mb-1">暂无任务</h3>
+                    <p class="text-gray-500 text-sm">开始添加您的第一个任务吧！</p>
                 </div>
                 
                 <!-- 任务列表 -->
@@ -442,73 +423,7 @@
             </div>
         </div>
 
-        <!-- 认证模态框 -->
-        <div id="authModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
-            <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 animate-slide-in">
-                <div class="flex justify-between items-center mb-6">
-                    <h2 class="text-2xl font-bold text-gray-800" id="authModalTitle">登录账号</h2>
-                    <button id="closeAuthModal" class="text-gray-400 hover:text-gray-600">
-                        <i class="fa fa-times text-xl"></i>
-                    </button>
-                </div>
-                
-                <div id="authForms">
-                    <!-- 登录表单 -->
-                    <div id="loginForm">
-                        <div class="mb-4">
-                            <label class="block text-gray-700 mb-2">邮箱地址</label>
-                            <input type="email" id="loginEmail" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="请输入邮箱">
-                        </div>
-                        <div class="mb-6">
-                            <label class="block text-gray-700 mb-2">密码</label>
-                            <input type="password" id="loginPassword" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="请输入密码">
-                        </div>
-                        <div class="mb-6">
-                            <label class="flex items-center">
-                                <input type="checkbox" id="rememberMe" class="w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary">
-                                <span class="ml-2 text-sm text-gray-700">记住我</span>
-                            </label>
-                        </div>
-                        <button id="loginBtn" class="w-full bg-primary hover:bg-blue-600 text-white py-3 rounded-lg font-medium transition-colors mb-4">
-                            <i class="fa fa-sign-in mr-2"></i>
-                            登录
-                        </button>
-                        <div class="text-center">
-                            <p class="text-gray-600 mb-2">还没有账号？</p>
-                            <button id="showRegisterForm" class="text-primary hover:text-blue-700 font-medium">
-                                创建新账号
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <!-- 注册表单 -->
-                    <div id="registerForm" class="hidden">
-                        <div class="mb-4">
-                            <label class="block text-gray-700 mb-2">用户名</label>
-                            <input type="text" id="registerName" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="请输入用户名">
-                        </div>
-                        <div class="mb-4">
-                            <label class="block text-gray-700 mb-2">邮箱地址</label>
-                            <input type="email" id="registerEmail" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="请输入邮箱">
-                        </div>
-                        <div class="mb-6">
-                            <label class="block text-gray-700 mb-2">密码</label>
-                            <input type="password" id="registerPassword" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="请输入密码">
-                        </div>
-                        <button id="registerBtn" class="w-full bg-primary hover:bg-blue-600 text-white py-3 rounded-lg font-medium transition-colors mb-4">
-                            <i class="fa fa-user-plus mr-2"></i>
-                            注册
-                        </button>
-                        <div class="text-center">
-                            <p class="text-gray-600 mb-2">已有账号？</p>
-                            <button id="showLoginForm" class="text-primary hover:text-blue-700 font-medium">
-                                返回登录
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+
 
         <!-- 通知提示 -->
         <div id="notification" class="fixed top-4 right-4 max-w-sm bg-white rounded-lg shadow-lg border border-gray-200 transform translate-x-full transition-transform duration-300 z-50">
@@ -535,11 +450,9 @@
 
         // 本地存储键名
         const STORAGE_KEYS = {
-            USER: 'taskpool_user',
             TASKS: 'taskpool_tasks',
             SETTINGS: 'taskpool_settings',
-            SYNC_STATE: 'taskpool_sync_state',
-            SESSION_TOKEN: 'taskpool_session_token'
+            SYNC_STATE: 'taskpool_sync_state'
         };
 
         // 为日期选择器添加无截止日期按钮
@@ -583,7 +496,6 @@
                 this.expandedTasks = new Set();
                 this.reminders = [];
                 this.reminderCheckInterval = null;
-                this.currentUser = null;
                 this.isOnline = navigator.onLine;
                 this.syncRetryCount = 0;
                 this.syncRetryTimeout = null;
@@ -607,7 +519,7 @@
                     this.updateSyncStatusUI('not_configured');
                 }
                 
-                this.showNotification('TaskPool已启动', 'success');
+                this.showNotification('任务池已启动', 'success');
                 
                 // 设置全局实例
                 window.app = this;
@@ -764,18 +676,6 @@
             }
 
             initializeElements() {
-                // 认证相关
-                this.authModal = document.getElementById('authModal');
-                this.authBtn = document.getElementById('authBtn');
-                this.closeAuthModal = document.getElementById('closeAuthModal');
-                this.loginForm = document.getElementById('loginForm');
-                this.registerForm = document.getElementById('registerForm');
-                this.showRegisterForm = document.getElementById('showRegisterForm');
-                this.showLoginForm = document.getElementById('showLoginForm');
-                this.loginBtn = document.getElementById('loginBtn');
-                this.registerBtn = document.getElementById('registerBtn');
-                this.userAvatar = document.getElementById('userAvatar');
-                this.userName = document.getElementById('userName');
 
                 // 任务相关
                 this.taskInput = document.getElementById('taskInput');
@@ -818,10 +718,6 @@
                 this.syncStatus = document.getElementById('syncStatus');
                 this.syncIndicator = document.getElementById('syncIndicator');
 
-                // 社交登录按钮
-                this.wechatSignInBtn = document.getElementById('wechatSignInBtn');
-                this.phoneSignInBtn = document.getElementById('phoneSignInBtn');
-
                 // 通知
                 this.notification = document.getElementById('notification');
                 this.notificationIcon = document.getElementById('notificationIcon');
@@ -831,39 +727,11 @@
             }
 
             // 模态框控制方法
-            showAuthModal() {
-                this.authModal.classList.remove('hidden');
-                this.switchToLogin();
-            }
-
-            hideAuthModal() {
-                this.authModal.classList.add('hidden');
-            }
-
             hideEditModal() {
                 this.editTaskModal.classList.add('hidden');
             }
 
-            switchToLogin() {
-                document.getElementById('authModalTitle').textContent = '登录账号';
-                this.loginForm.classList.remove('hidden');
-                this.registerForm.classList.add('hidden');
-            }
-
-            switchToRegister() {
-                document.getElementById('authModalTitle').textContent = '创建账号';
-                this.loginForm.classList.add('hidden');
-                this.registerForm.classList.remove('hidden');
-            }
-
             bindEvents() {
-                // 认证相关事件
-                this.authBtn.addEventListener('click', () => this.showAuthModal());
-                this.closeAuthModal.addEventListener('click', () => this.hideAuthModal());
-                this.showRegisterForm.addEventListener('click', () => this.switchToRegister());
-                this.showLoginForm.addEventListener('click', () => this.switchToLogin());
-                this.loginBtn.addEventListener('click', () => this.login());
-                this.registerBtn.addEventListener('click', () => this.register());
 
                 // 任务相关事件
                 this.addTaskBtn.addEventListener('click', () => this.addTask());
@@ -943,12 +811,6 @@
                 });
 
                 // 点击模态框外部关闭
-                this.authModal.addEventListener('click', (e) => {
-                    if (e.target === this.authModal) {
-                        this.hideAuthModal();
-                    }
-                });
-
                 this.editTaskModal.addEventListener('click', (e) => {
                     if (e.target === this.editTaskModal) {
                         this.hideEditModal();
@@ -972,22 +834,12 @@
                     this.isOnline = false;
                     this.updateSyncStatusUI('error', '网络连接已断开');
                 });
-
-                // 社交登录事件
-                this.wechatSignInBtn.addEventListener('click', () => this.signInWithWechat());
-                this.phoneSignInBtn.addEventListener('click', () => this.showPhoneLoginModal());
             }
 
             initApp() {
                 try {
-                    // 检查本地存储的用户信息
-                    this.loadUserFromStorage();
-                    
                     // 监听网络状态变化
                     this.setupNetworkListeners();
-                    
-                    // 检查自动登录
-                    this.checkAutoLogin();
                     
                     console.log('应用初始化成功');
                     
@@ -1047,234 +899,7 @@
                 }, delay);
             }
 
-            loadUserFromStorage() {
-                try {
-                    const userData = localStorage.getItem(STORAGE_KEYS.USER);
-                    const sessionToken = localStorage.getItem(STORAGE_KEYS.SESSION_TOKEN);
-                    
-                    if (userData && sessionToken) {
-                        this.currentUser = JSON.parse(userData);
-                        this.sessionToken = sessionToken;
-                        this.updateUserInfo();
-                        console.log('从本地存储恢复用户登录状态');
-                    }
-                    // 更新同步状态，基于GitHub配置而非用户登录
-                    if (this.githubSyncManager) {
-                        this.updateSyncStatusUI('configured');
-                    } else {
-                        this.updateSyncStatusUI('not_configured');
-                    }
-                } catch (error) {
-                    console.error('加载用户信息失败:', error);
-                }
-            }
 
-            checkAutoLogin() {
-                // 检查是否有记住的登录状态
-                const rememberMe = localStorage.getItem('taskpool_remember_me') === 'true';
-                if (rememberMe && this.currentUser) {
-                    this.validateSession();
-                }
-            }
-
-            hasValidSession() {
-                return this.sessionToken && this.currentUser;
-            }
-
-            async validateSession() {
-                if (!this.hasValidSession()) return false;
-                
-                try {
-                    // 模拟验证会话有效性
-                    const sessionData = JSON.parse(atob(this.sessionToken));
-                    const expiresAt = new Date(sessionData.expiresAt);
-                    return expiresAt > new Date();
-                } catch (error) {
-                    console.error('会话验证失败:', error);
-                    this.logout();
-                    return false;
-                }
-            }
-
-            signInWithWechat() {
-                try {
-                    // 模拟微信登录流程
-                    this.showNotification('正在打开微信登录...', 'info');
-                    
-                    // 显示微信登录二维码模态框
-                    this.showWechatLoginModal();
-                    
-                } catch (error) {
-                    console.error('微信登录出错:', error);
-                    this.showNotification('微信登录失败', 'danger');
-                }
-            }
-
-            showWechatLoginModal() {
-                // 创建微信登录模态框
-                const modal = document.createElement('div');
-                modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center';
-                modal.id = 'wechatLoginModal';
-                
-                modal.innerHTML = `
-                    <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4 animate-slide-in">
-                        <div class="text-center">
-                            <h3 class="text-xl font-bold text-gray-800 mb-4">微信扫码登录</h3>
-                            <div class="bg-white p-4 inline-block rounded-lg border-2 border-gray-200 mb-4">
-                                <div class="w-48 h-48 bg-gray-100 flex items-center justify-center">
-                                    <i class="fa fa-qrcode text-6xl text-gray-400"></i>
-                                </div>
-                            </div>
-                            <p class="text-sm text-gray-600 mb-4">请使用微信扫描二维码登录</p>
-                            <div class="flex justify-center space-x-3">
-                                <button id="cancelWechatLogin" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
-                                    取消
-                                </button>
-                                <button id="simulateWechatLogin" class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors">
-                                    模拟登录成功
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                `;
-                
-                document.body.appendChild(modal);
-                
-                // 绑定事件
-                document.getElementById('cancelWechatLogin').addEventListener('click', () => {
-                    document.body.removeChild(modal);
-                });
-                
-                document.getElementById('simulateWechatLogin').addEventListener('click', () => {
-                    this.simulateWechatLoginSuccess();
-                    document.body.removeChild(modal);
-                });
-            }
-
-            simulateWechatLoginSuccess() {
-                // 模拟微信登录成功
-                const wechatUser = {
-                    uid: 'wx_' + Date.now(),
-                    displayName: '微信用户',
-                    avatar: 'https://cdn.jsdelivr.net/gh/ionic-team/ionicons@5.5.1/src/svg/person-circle-outline.svg',
-                    loginType: 'wechat',
-                    createdAt: new Date().toISOString()
-                };
-                
-                this.completeLogin(wechatUser);
-            }
-
-            showPhoneLoginModal() {
-                // 创建手机号登录模态框
-                const modal = document.createElement('div');
-                modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center';
-                modal.id = 'phoneLoginModal';
-                
-                modal.innerHTML = `
-                    <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4 animate-slide-in">
-                        <div>
-                            <h3 class="text-xl font-bold text-gray-800 mb-4">手机号登录</h3>
-                            <div class="mb-4">
-                                <label class="block text-sm font-medium text-gray-700 mb-1">手机号</label>
-                                <input type="tel" id="phoneNumber" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="请输入手机号">
-                            </div>
-                            <div class="mb-4">
-                                <label class="block text-sm font-medium text-gray-700 mb-1">验证码</label>
-                                <div class="flex space-x-2">
-                                    <input type="text" id="verificationCode" class="flex-1 px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="请输入验证码">
-                                    <button id="sendCodeBtn" class="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors whitespace-nowrap">
-                                        发送验证码
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="flex justify-center space-x-3 mt-6">
-                                <button id="cancelPhoneLogin" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
-                                    取消
-                                </button>
-                                <button id="confirmPhoneLogin" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
-                                    登录
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                `;
-                
-                document.body.appendChild(modal);
-                
-                // 绑定事件
-                document.getElementById('cancelPhoneLogin').addEventListener('click', () => {
-                    document.body.removeChild(modal);
-                });
-                
-                document.getElementById('sendCodeBtn').addEventListener('click', () => {
-                    this.sendVerificationCode();
-                });
-                
-                document.getElementById('confirmPhoneLogin').addEventListener('click', () => {
-                    this.confirmPhoneLogin();
-                });
-            }
-
-            sendVerificationCode() {
-                const phoneNumber = document.getElementById('phoneNumber').value.trim();
-                if (!phoneNumber || !/^1[3-9]\d{9}$/.test(phoneNumber)) {
-                    this.showNotification('请输入正确的手机号', 'warning');
-                    return;
-                }
-                
-                const sendBtn = document.getElementById('sendCodeBtn');
-                sendBtn.disabled = true;
-                sendBtn.textContent = '发送中...';
-                
-                // 模拟发送验证码
-                setTimeout(() => {
-                    this.showNotification('验证码已发送，测试验证码：123456', 'success');
-                    sendBtn.textContent = '重新发送(60s)';
-                    
-                    let countdown = 60;
-                    const timer = setInterval(() => {
-                        countdown--;
-                        sendBtn.textContent = `重新发送(${countdown}s)`;
-                        if (countdown <= 0) {
-                            clearInterval(timer);
-                            sendBtn.disabled = false;
-                            sendBtn.textContent = '发送验证码';
-                        }
-                    }, 1000);
-                }, 1000);
-            }
-
-            confirmPhoneLogin() {
-                const phoneNumber = document.getElementById('phoneNumber').value.trim();
-                const code = document.getElementById('verificationCode').value.trim();
-                
-                if (!phoneNumber || !/^1[3-9]\d{9}$/.test(phoneNumber)) {
-                    this.showNotification('请输入正确的手机号', 'warning');
-                    return;
-                }
-                
-                if (!code) {
-                    this.showNotification('请输入验证码', 'warning');
-                    return;
-                }
-                
-                // 模拟验证码验证（测试验证码：123456）
-                if (code === '123456') {
-                    const phoneUser = {
-                        uid: 'phone_' + phoneNumber,
-                        displayName: '用户' + phoneNumber.slice(-4),
-                        phoneNumber: phoneNumber,
-                        avatar: 'https://cdn.jsdelivr.net/gh/ionic-team/ionicons@5.5.1/src/svg/person-circle-outline.svg',
-                        loginType: 'phone',
-                        createdAt: new Date().toISOString()
-                    };
-                    
-                    this.completeLogin(phoneUser);
-                    document.body.removeChild(document.getElementById('phoneLoginModal'));
-                } else {
-                    this.showNotification('验证码错误', 'danger');
-                }
-            }
 
             initDatePickers() {
                 try {
@@ -1484,160 +1109,10 @@
                 }
             }
 
-            updateSyncStatus() {
-                if (this.currentUser) {
-                    if (this.isOnline) {
-                        this.syncStatus.innerHTML = `<i class="fa fa-cloud"></i> 已连接服务器`;
-                        this.syncIndicator.className = 'sync-indicator';
-                    } else {
-                        this.syncStatus.innerHTML = `<i class="fa fa-wifi-slash"></i> 离线模式`;
-                        this.syncIndicator.className = 'sync-indicator offline';
-                    }
-                } else {
-                    this.syncStatus.innerHTML = `<i class="fa fa-user-slash"></i> 未登录`;
-                    this.syncIndicator.className = 'sync-indicator offline';
-                }
-            }
 
-            showAuthModal() {
-                this.authModal.classList.remove('hidden');
-                this.switchToLogin();
-            }
-
-            hideAuthModal() {
-                this.authModal.classList.add('hidden');
-            }
 
             hideEditModal() {
                 this.editTaskModal.classList.add('hidden');
-            }
-
-            switchToLogin() {
-                document.getElementById('authModalTitle').textContent = '登录账号';
-                this.loginForm.classList.remove('hidden');
-                this.registerForm.classList.add('hidden');
-            }
-
-            switchToRegister() {
-                document.getElementById('authModalTitle').textContent = '创建账号';
-                this.loginForm.classList.add('hidden');
-                this.registerForm.classList.remove('hidden');
-            }
-
-            login() {
-                const email = document.getElementById('loginEmail').value.trim();
-                const password = document.getElementById('loginPassword').value;
-                const rememberMe = document.getElementById('rememberMe')?.checked || false;
-
-                if (!email || !password) {
-                    this.showNotification('请填写完整的登录信息', 'warning');
-                    return;
-                }
-
-                // 模拟账号密码登录
-                this.showNotification('登录中...', 'info');
-
-                // 模拟登录验证
-                setTimeout(() => {
-                    // 测试账号：test@example.com，密码：123456
-                    if (email === 'test@example.com' && password === '123456') {
-                        const user = {
-                            uid: 'email_' + Date.now(),
-                            email: email,
-                            displayName: email.split('@')[0],
-                            avatar: 'https://cdn.jsdelivr.net/gh/ionic-team/ionicons@5.5.1/src/svg/person-circle-outline.svg',
-                            loginType: 'email',
-                            createdAt: new Date().toISOString()
-                        };
-                        
-                        this.completeLogin(user, rememberMe);
-                        this.hideAuthModal();
-                    } else {
-                        this.showNotification('账号或密码错误（测试账号：test@example.com，密码：123456）', 'danger');
-                    }
-                }, 1000);
-            }
-
-            register() {
-                const name = document.getElementById('registerName').value.trim();
-                const email = document.getElementById('registerEmail').value.trim();
-                const password = document.getElementById('registerPassword').value;
-
-                if (!name || !email || !password) {
-                    this.showNotification('请填写完整的注册信息', 'warning');
-                    return;
-                }
-
-                if (password.length < 6) {
-                    this.showNotification('密码至少需要6个字符', 'warning');
-                    return;
-                }
-
-                // 模拟注册流程
-                this.showNotification('注册中...', 'info');
-
-                setTimeout(() => {
-                    const user = {
-                        uid: 'email_' + Date.now(),
-                        email: email,
-                        displayName: name,
-                        avatar: 'https://cdn.jsdelivr.net/gh/ionic-team/ionicons@5.5.1/src/svg/person-circle-outline.svg',
-                        loginType: 'email',
-                        createdAt: new Date().toISOString()
-                    };
-                    
-                    this.completeLogin(user);
-                    this.hideAuthModal();
-                    this.showNotification('注册成功！', 'success');
-                }, 1000);
-            }
-
-            updateUserInfo() {
-                if (this.currentUser) {
-                    const displayName = this.currentUser.displayName || this.currentUser.email?.split('@')[0] || '用户';
-                    const initial = displayName.charAt(0).toUpperCase();
-                    
-                    // 如果有头像，使用头像
-                    if (this.currentUser.avatar) {
-                        this.userAvatar.innerHTML = `<img src="${this.currentUser.avatar}" class="w-full h-full rounded-full object-cover">`;
-                    } else {
-                        this.userAvatar.textContent = initial;
-                    }
-                    
-                    this.userName.textContent = displayName;
-                    this.authBtn.innerHTML = '<i class="fa fa-sign-out mr-1"></i>退出登录';
-                    this.authBtn.addEventListener('click', () => this.logout(), { once: true });
-                } else {
-                    this.userAvatar.textContent = '用';
-                    this.userName.textContent = '用户';
-                    this.authBtn.innerHTML = '<i class="fa fa-user-circle mr-1"></i>登录/注册';
-                    this.authBtn.addEventListener('click', () => this.showAuthModal(), { once: true });
-                }
-            }
-
-            logout() {
-                if (confirm('确定要退出登录吗？')) {
-                    // 清除本地存储的用户信息
-                    localStorage.removeItem(STORAGE_KEYS.USER);
-                    localStorage.removeItem(STORAGE_KEYS.SESSION_TOKEN);
-                    localStorage.removeItem('taskpool_remember_me');
-                    
-                    // 清除会话信息
-                    this.currentUser = null;
-                    this.sessionToken = null;
-                    
-                    // 更新UI
-                    this.updateUserInfo();
-                    // 更新同步状态，基于GitHub配置而非用户登录
-                    if (this.githubSyncManager) {
-                        this.updateSyncStatusUI('configured');
-                    } else {
-                        this.updateSyncStatusUI('not_configured');
-                    }
-                    
-                    this.showNotification('已退出登录', 'info');
-                    console.log('用户退出登录');
-                }
             }
 
             addTask() {
@@ -1791,13 +1266,13 @@
                 }
 
                 let taskHtml = `
-                    <div class="task-item ${levelClass} ${priorityClass} ${completedClass} border rounded-lg p-3 mb-2 card-hover animate-fade-in" 
-                         data-id="${task.id}" style="padding-left: ${32 + indent}px; position: relative;">
+                    <div class="task-item ${levelClass} ${priorityClass} ${completedClass} border rounded p-2 mb-1 animate-fade-in" 
+                         data-id="${task.id}" style="padding-left: ${28 + indent}px; position: relative;">
                         ${level > 0 ? `<div class="absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-0.5 bg-gray-300"></div>` : ''}
                         <div class="flex items-center justify-between">
                             <div class="flex items-center space-x-2 flex-1">
                                 <button 
-                                    class="toggle-task w-5 h-5 rounded border-2 ${task.completed ? 'bg-success border-success' : 'border-gray-300'} flex items-center justify-center transition-all duration-200"
+                                    class="toggle-task w-4 h-4 rounded border-2 ${task.completed ? 'bg-success border-success' : 'border-gray-300'} flex items-center justify-center transition-all duration-200"
                                     data-id="${task.id}"
                                     title="${task.completed ? '标记为未完成' : '标记为完成'}"
                                 >
@@ -1805,45 +1280,44 @@
                                 </button>
                                 <div class="flex-1 min-w-0">
                                     <div class="flex items-center">
-                                        <p class="text-sm font-medium ${task.completed ? 'line-through text-gray-500' : 'text-gray-800'} truncate" title="${this.escapeHtml(task.title)}">
+                                        <p class="text-xs font-medium ${task.completed ? 'line-through text-gray-500' : 'text-gray-800'} truncate" title="${this.escapeHtml(task.title)}">
                                             ${this.escapeHtml(task.title)}
                                         </p>
                                         ${hasChildren ? `
-                                            <span class="inline-flex items-center justify-center w-5 h-5 text-xs bg-blue-100 text-blue-800 rounded-full ml-2">
+                                            <span class="inline-flex items-center justify-center w-4 h-4 text-xs bg-blue-100 text-blue-800 rounded-full ml-1">
                                                 ${task.children.length}
                                             </span>
                                         ` : ''}
                                     </div>
-                                    <div class="flex items-center space-x-3 mt-1">
-                                        <span class="inline-block w-2 h-2 rounded-full bg-${task.priority}"></span>
+                                    <div class="flex items-center space-x-2 mt-0.5">
+                                        <span class="inline-block w-1.5 h-1.5 rounded-full bg-${task.priority}"></span>
                                         <span class="text-xs">${dueDateText}</span>
-                                        <span class="text-xs text-gray-500">${this.formatRelativeTime(task.createdAt)}</span>
                                     </div>
                                     ${childStats}
                                 </div>
                             </div>
-                            <div class="flex items-center space-x-2">
+                            <div class="flex items-center space-x-1">
                                 ${hasChildren ? `
                                     <button 
-                                        class="expand-task w-6 h-6 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100 transition-colors"
+                                        class="expand-task w-5 h-5 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100 transition-colors"
                                         data-id="${task.id}"
                                     >
-                                        <i class="fa fa-angle-${isExpanded ? 'down' : 'right'}"></i>
+                                        <i class="fa fa-angle-${isExpanded ? 'down' : 'right'} text-xs"></i>
                                     </button>
                                 ` : ''}
                                 <button 
-                                    class="edit-task w-6 h-6 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100 transition-colors"
+                                    class="edit-task w-5 h-5 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100 transition-colors"
                                     data-id="${task.id}"
                                     title="编辑任务"
                                 >
-                                    <i class="fa fa-pencil"></i>
+                                    <i class="fa fa-pencil text-xs"></i>
                                 </button>
                                 <button 
-                                    class="delete-task w-6 h-6 rounded-full flex items-center justify-center text-gray-500 hover:bg-red-100 hover:text-danger transition-colors"
+                                    class="delete-task w-5 h-5 rounded-full flex items-center justify-center text-gray-500 hover:bg-red-100 hover:text-danger transition-colors"
                                     data-id="${task.id}"
                                     title="删除任务"
                                 >
-                                    <i class="fa fa-trash"></i>
+                                    <i class="fa fa-trash text-xs"></i>
                                 </button>
                             </div>
                         </div>
@@ -2165,42 +1639,7 @@
 
 
 
-            completeLogin(user, rememberMe = false) {
-                // 生成会话令牌
-                const sessionData = {
-                    userId: user.uid,
-                    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7天过期
-                    issuedAt: new Date().toISOString()
-                };
-                
-                this.sessionToken = btoa(JSON.stringify(sessionData));
-                this.currentUser = user;
-                
-                // 保存用户信息到本地存储
-                localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
-                localStorage.setItem(STORAGE_KEYS.SESSION_TOKEN, this.sessionToken);
-                
-                if (rememberMe) {
-                    localStorage.setItem('taskpool_remember_me', 'true');
-                }
-                
-                // 更新UI
-                this.updateUserInfo();
-                // 更新同步状态，基于GitHub配置而非用户登录
-                if (this.githubSyncManager) {
-                    this.updateSyncStatusUI('configured');
-                } else {
-                    this.updateSyncStatusUI('not_configured');
-                }
-                
-                // 同步任务
-                if (this.isOnline) {
-                    this.syncTasksWithServer();
-                }
-                
-                this.showNotification(`欢迎回来，${user.displayName}！`, 'success');
-                console.log('用户登录成功:', user);
-            }
+
 
             formatDateForInput(dateString) {
                 if (!dateString) return '';
