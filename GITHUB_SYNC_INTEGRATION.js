@@ -584,182 +584,226 @@ class GitHubSyncManager {
         this.isSyncing = true;
         let retries = 0;
         
-        while (retries <= maxRetries) {
-            try {
-                console.log(`开始同步... (尝试 ${retries + 1}/${maxRetries + 1})`);
-                
-                // 步骤1: 获取远程数据
-                console.log('步骤1: 获取远程数据');
-                const remoteData = await this.fetchRemoteData();
-                
-                // 步骤2: 获取本地数据
-                console.log('步骤2: 获取本地数据');
-                const localData = this.getLocalData(tasks);
-                
-                // 步骤3: 解决冲突
-                console.log('步骤3: 解决冲突');
-                const resolvedData = this.resolveConflict(localData, remoteData);
-                
-                // 步骤4: 上传解决后的数据
-                console.log('步骤4: 上传数据到Gist');
-                await this.uploadLocalData(resolvedData);
-                
-                console.log('同步完成');
-                
-                return { 
-                    success: true, 
-                    message: '同步成功',
-                    tasks: resolvedData.tasks,
-                    syncedTasks: resolvedData.tasks.length,
-                    lastSync: resolvedData.lastSync,
-                    conflictResolved: resolvedData.conflictResolved || false,
-                    retries: retries
-                };
-            } catch (error) {
-                console.error(`同步错误 (尝试 ${retries + 1}/${maxRetries + 1}):`, error);
-                
-                retries++;
-                
-                // 如果达到最大重试次数，返回失败
-                if (retries > maxRetries) {
-                    const errorType = this.classifyError(error);
+        try {
+            while (retries <= maxRetries) {
+                try {
+                    console.log(`开始同步... (尝试 ${retries + 1}/${maxRetries + 1})`);
+                    
+                    // 步骤1: 获取远程数据
+                    console.log('步骤1: 获取远程数据');
+                    const remoteData = await this.fetchRemoteData();
+                    
+                    // 步骤2: 获取本地数据
+                    console.log('步骤2: 获取本地数据');
+                    const localData = this.getLocalData(tasks);
+                    
+                    // 步骤3: 解决冲突
+                    console.log('步骤3: 解决冲突');
+                    const resolvedData = this.resolveConflict(localData, remoteData);
+                    
+                    // 步骤4: 上传解决后的数据
+                    console.log('步骤4: 上传数据到Gist');
+                    await this.uploadLocalData(resolvedData);
+                    
+                    console.log('同步完成');
+                    
                     return { 
-                        success: false, 
-                        message: error.message || '同步失败',
-                        error: error.toString(),
-                        errorType: errorType,
-                        retries: retries - 1
+                        success: true, 
+                        message: '同步成功',
+                        tasks: resolvedData.tasks,
+                        syncedTasks: resolvedData.tasks.length,
+                        lastSync: resolvedData.lastSync,
+                        conflictResolved: resolvedData.conflictResolved || false,
+                        retries: retries
                     };
+                } catch (error) {
+                    console.error(`同步错误 (尝试 ${retries + 1}/${maxRetries + 1}):`, error);
+                    
+                    retries++;
+                    
+                    // 如果达到最大重试次数，返回失败
+                    if (retries > maxRetries) {
+                        const errorType = this.classifyError(error);
+                        return { 
+                            success: false, 
+                            message: error.message || '同步失败',
+                            error: error.toString(),
+                            errorType: errorType,
+                            retries: retries - 1
+                        };
+                    }
+                    
+                    // 重试前检查网络状态
+                    if (!this.checkNetworkStatus()) {
+                        console.log('网络已断开，停止重试');
+                        return { 
+                            success: false, 
+                            message: '网络已断开，同步失败',
+                            errorType: 'network',
+                            retries: retries - 1
+                        };
+                    }
+                    
+                    // 等待重试延迟
+                    console.log(`等待 ${retryDelay}ms 后重试...`);
+                    await new Promise(resolve => setTimeout(resolve, retryDelay));
+                    
+                    // 指数退避策略
+                    retryDelay *= 2;
                 }
-                
-                // 重试前检查网络状态
-                if (!this.checkNetworkStatus()) {
-                    console.log('网络已断开，停止重试');
-                    return { 
-                        success: false, 
-                        message: '网络已断开，同步失败',
-                        errorType: 'network',
-                        retries: retries - 1
-                    };
-                }
-                
-                // 等待重试延迟
-                console.log(`等待 ${retryDelay}ms 后重试...`);
-                await new Promise(resolve => setTimeout(resolve, retryDelay));
-                
-                // 指数退避策略
-                retryDelay *= 2;
             }
+        } finally {
+            // 确保无论成功还是失败，都重置同步状态
+            this.isSyncing = false;
+            console.log('同步状态已重置');
         }
     }
     
     // 仅下载数据（不上传）
     async downloadOnly(maxRetries = 2, retryDelay = 1500) {
+        // 检查是否正在同步
+        if (this.isSyncing) {
+            console.log('同步已在进行中');
+            return { success: false, message: '同步已在进行中' };
+        }
+        
+        // 检查网络状态
+        if (!this.checkNetworkStatus()) {
+            console.log('当前处于离线状态，无法下载数据');
+            return { success: false, message: '当前处于离线状态，无法下载数据', errorType: 'network' };
+        }
+        
+        this.isSyncing = true;
         let retries = 0;
         
-        while (retries <= maxRetries) {
-            try {
-                console.log(`开始下载数据... (尝试 ${retries + 1}/${maxRetries + 1})`);
-                
-                const remoteData = await this.fetchRemoteData();
-                
-                console.log('数据下载完成');
-                
-                return {
-                    success: true,
-                    message: '数据下载成功',
-                    tasks: remoteData.tasks,
-                    downloadedTasks: remoteData.tasks.length,
-                    lastSync: remoteData.lastSync,
-                    retries: retries
-                };
-            } catch (error) {
-                console.error(`下载数据错误 (尝试 ${retries + 1}/${maxRetries + 1}):`, error);
-                
-                retries++;
-                
-                if (retries > maxRetries) {
-                    const errorType = this.classifyError(error);
+        try {
+            while (retries <= maxRetries) {
+                try {
+                    console.log(`开始下载数据... (尝试 ${retries + 1}/${maxRetries + 1})`);
+                    
+                    const remoteData = await this.fetchRemoteData();
+                    
+                    console.log('数据下载完成');
+                    
                     return {
-                        success: false,
-                        message: error.message || '下载失败',
-                        error: error.toString(),
-                        errorType: errorType,
-                        retries: retries - 1
+                        success: true,
+                        message: '数据下载成功',
+                        tasks: remoteData.tasks,
+                        downloadedTasks: remoteData.tasks.length,
+                        lastSync: remoteData.lastSync,
+                        retries: retries
                     };
+                } catch (error) {
+                    console.error(`下载数据错误 (尝试 ${retries + 1}/${maxRetries + 1}):`, error);
+                    
+                    retries++;
+                    
+                    if (retries > maxRetries) {
+                        const errorType = this.classifyError(error);
+                        return {
+                            success: false,
+                            message: error.message || '下载失败',
+                            error: error.toString(),
+                            errorType: errorType,
+                            retries: retries - 1
+                        };
+                    }
+                    
+                    // 重试前检查网络状态
+                    if (!this.checkNetworkStatus()) {
+                        console.log('网络已断开，停止下载重试');
+                        return {
+                            success: false,
+                            message: '网络已断开，下载失败',
+                            errorType: 'network',
+                            retries: retries - 1
+                        };
+                    }
+                    
+                    // 等待重试延迟
+                    console.log(`等待 ${retryDelay}ms 后重试下载...`);
+                    await new Promise(resolve => setTimeout(resolve, retryDelay));
+                    retryDelay *= 2;
                 }
-                
-                // 重试前检查网络状态
-                if (!this.checkNetworkStatus()) {
-                    console.log('网络已断开，停止下载重试');
-                    return {
-                        success: false,
-                        message: '网络已断开，下载失败',
-                        errorType: 'network',
-                        retries: retries - 1
-                    };
-                }
-                
-                // 等待重试延迟
-                console.log(`等待 ${retryDelay}ms 后重试下载...`);
-                await new Promise(resolve => setTimeout(resolve, retryDelay));
-                retryDelay *= 2;
             }
+        } finally {
+            // 确保无论成功还是失败，都重置同步状态
+            this.isSyncing = false;
+            console.log('下载状态已重置');
         }
     }
     
     // 仅上传数据（不下载）
     async uploadOnly(tasks, maxRetries = 2, retryDelay = 1500) {
+        // 检查是否正在同步
+        if (this.isSyncing) {
+            console.log('同步已在进行中');
+            return { success: false, message: '同步已在进行中' };
+        }
+        
+        // 检查网络状态
+        if (!this.checkNetworkStatus()) {
+            console.log('当前处于离线状态，无法上传数据');
+            return { success: false, message: '当前处于离线状态，无法上传数据', errorType: 'network' };
+        }
+        
+        this.isSyncing = true;
         let retries = 0;
         
-        while (retries <= maxRetries) {
-            try {
-                console.log(`开始上传数据... (尝试 ${retries + 1}/${maxRetries + 1})`);
-                
-                const localData = this.getLocalData(tasks);
-                await this.uploadLocalData(localData);
-                
-                console.log('数据上传完成');
-                
-                return {
-                    success: true,
-                    message: '数据上传成功',
-                    uploadedTasks: localData.tasks.length,
-                    lastSync: this.lastSyncTime,
-                    retries: retries
-                };
-            } catch (error) {
-                console.error(`上传数据错误 (尝试 ${retries + 1}/${maxRetries + 1}):`, error);
-                
-                retries++;
-                
-                if (retries > maxRetries) {
-                    const errorType = this.classifyError(error);
+        try {
+            while (retries <= maxRetries) {
+                try {
+                    console.log(`开始上传数据... (尝试 ${retries + 1}/${maxRetries + 1})`);
+                    
+                    const localData = this.getLocalData(tasks);
+                    await this.uploadLocalData(localData);
+                    
+                    console.log('数据上传完成');
+                    
                     return {
-                        success: false,
-                        message: error.message || '上传失败',
-                        error: error.toString(),
-                        errorType: errorType,
-                        retries: retries - 1
+                        success: true,
+                        message: '数据上传成功',
+                        uploadedTasks: localData.tasks.length,
+                        lastSync: this.lastSyncTime,
+                        retries: retries
                     };
+                } catch (error) {
+                    console.error(`上传数据错误 (尝试 ${retries + 1}/${maxRetries + 1}):`, error);
+                    
+                    retries++;
+                    
+                    if (retries > maxRetries) {
+                        const errorType = this.classifyError(error);
+                        return {
+                            success: false,
+                            message: error.message || '上传失败',
+                            error: error.toString(),
+                            errorType: errorType,
+                            retries: retries - 1
+                        };
+                    }
+                    
+                    // 重试前检查网络状态
+                    if (!this.checkNetworkStatus()) {
+                        console.log('网络已断开，停止上传重试');
+                        return {
+                            success: false,
+                            message: '网络已断开，上传失败',
+                            errorType: 'network',
+                            retries: retries - 1
+                        };
+                    }
+                    
+                    // 等待重试延迟
+                    console.log(`等待 ${retryDelay}ms 后重试上传...`);
+                    await new Promise(resolve => setTimeout(resolve, retryDelay));
+                    retryDelay *= 2;
                 }
-                
-                // 重试前检查网络状态
-                if (!this.checkNetworkStatus()) {
-                    console.log('网络已断开，停止上传重试');
-                    return {
-                        success: false,
-                        message: '网络已断开，上传失败',
-                        errorType: 'network',
-                        retries: retries - 1
-                    };
-                }
-                
-                // 等待重试延迟
-                console.log(`等待 ${retryDelay}ms 后重试上传...`);
-                await new Promise(resolve => setTimeout(resolve, retryDelay));
-                retryDelay *= 2;
             }
+        } finally {
+            // 确保无论成功还是失败，都重置同步状态
+            this.isSyncing = false;
+            console.log('上传状态已重置');
         }
     }
 }
