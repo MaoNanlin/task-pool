@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TaskPool 移动端演示</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3b82f6',
+                        secondary: '#64748b',
+                        success: '#10b981',
+                        danger: '#ef4444',
+                        warning: '#f59e0b',
+                        info: '#06b6d4'
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .gradient-bg {
+                background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            }
+            .text-gradient {
+                background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+            }
+            .phone-frame {
+                border: 20px solid #000;
+                border-radius: 40px;
+                max-width: 320px;
+                margin: 0 auto;
+                box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            }
+            .phone-screen {
+                height: 600px;
+                overflow-y: auto;
+                background: #f8fafc;
+            }
+            .phone-notch {
+                height: 20px;
+                background: #000;
+                border-radius: 20px 20px 0 0;
+                position: relative;
+            }
+            .phone-notch::after {
+                content: '';
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 100px;
+                height: 20px;
+                background: #000;
+                border-radius: 10px;
+            }
+            .tab-active {
+                color: #3b82f6;
+                border-bottom: 3px solid #3b82f6;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- 导航栏 -->
+    <nav class="bg-white shadow-lg">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 gradient-bg rounded-lg flex items-center justify-center">
+                        <i class="fa fa-tasks text-white text-xl"></i>
+                    </div>
+                    <h1 class="text-2xl font-bold text-gradient">TaskPool</h1>
+                </div>
+                <div class="hidden md:flex space-x-6">
+                    <a href="index.html" class="text-gray-600 hover:text-primary transition-colors">返回应用</a>
+                    <a href="#guide" class="text-gray-600 hover:text-primary transition-colors">使用指南</a>
+                    <a href="#demo" class="text-gray-600 hover:text-primary transition-colors">功能演示</a>
+                    <a href="#faq" class="text-gray-600 hover:text-primary transition-colors">常见问题</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主要内容 -->
+    <main class="container mx-auto px-4 py-8">
+        <!-- 英雄区域 -->
+        <section class="text-center mb-16">
+            <h2 class="text-4xl font-bold text-gray-800 mb-4">随时随地管理您的任务</h2>
+            <p class="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
+                TaskPool 完全支持移动设备，让您在手机上也能高效管理任务。响应式设计，触摸友好，离线支持。
+            </p>
+            <div class="flex flex-col md:flex-row justify-center items-center space-y-4 md:space-y-0 md:space-x-6">
+                <a href="index.html" class="px-8 py-3 bg-primary hover:bg-blue-600 text-white rounded-lg transition-colors flex items-center justify-center">
+                    <i class="fa fa-play-circle mr-2"></i>
+                    立即体验
+                </a>
+                <a href="#guide" class="px-8 py-3 border border-gray-300 hover:border-primary text-gray-700 hover:text-primary rounded-lg transition-colors flex items-center justify-center">
+                    <i class="fa fa-book mr-2"></i>
+                    查看指南
+                </a>
+            </div>
+        </section>
+
+        <!-- 手机演示 -->
+        <section id="demo" class="mb-16">
+            <h3 class="text-3xl font-bold text-center text-gray-800 mb-8">移动端功能演示</h3>
+            
+            <div class="phone-frame">
+                <div class="phone-notch"></div>
+                <div class="phone-screen">
+                    <!-- 手机界面 -->
+                    <div class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-full">
+                        <!-- 应用标题 -->
+                        <header class="text-center py-6">
+                            <div class="flex items-center justify-center space-x-3 mb-2">
+                                <div class="w-10 h-10 bg-gradient-to-r from-primary to-purple-500 rounded-lg flex items-center justify-center shadow-lg">
+                                    <i class="fa fa-tasks text-white text-xl"></i>
+                                </div>
+                                <h1 class="text-2xl font-bold text-gradient">TaskPool</h1>
+                            </div>
+                            <p class="text-sm text-gray-600">云端任务管理系统</p>
+                        </header>
+
+                        <!-- 用户信息 -->
+                        <div class="bg-white mx-4 rounded-2xl shadow-lg p-4 mb-4">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-8 h-8 bg-gradient-to-r from-primary to-purple-500 rounded-full flex items-center justify-center text-white font-semibold text-xs">
+                                        用
+                                    </div>
+                                    <div>
+                                        <p class="font-medium text-gray-800 text-sm">用户</p>
+                                        <p class="text-xs text-gray-500">
+                                            <i class="fa fa-cloud"></i> 已连接
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-2 h-2 rounded-full bg-green-500"></div>
+                                    <i class="fa fa-refresh text-sm text-gray-500"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 添加任务 -->
+                        <div class="bg-white mx-4 rounded-2xl shadow-lg p-4 mb-4">
+                            <h2 class="text-sm font-bold text-gray-800 mb-3">添加新任务</h2>
+                            <div class="mb-3">
+                                <input 
+                                    type="text" 
+                                    class="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm"
+                                    placeholder="添加新的任务..."
+                                >
+                            </div>
+                            <div class="grid grid-cols-3 gap-2 mb-3">
+                                <button class="py-1 px-2 border rounded-lg text-xs">
+                                    <span class="inline-block w-2 h-2 bg-red-500 rounded-full mr-1"></span>
+                                    高
+                                </button>
+                                <button class="py-1 px-2 border rounded-lg text-xs bg-yellow-50 bg-opacity-10 border-yellow-300">
+                                    <span class="inline-block w-2 h-2 bg-yellow-500 rounded-full mr-1"></span>
+                                    中
+                                </button>
+                                <button class="py-1 px-2 border rounded-lg text-xs">
+                                    <span class="inline-block w-2 h-2 bg-green-500 rounded-full mr-1"></span>
+                                    低
+                                </button>
+                            </div>
+                            <button class="w-full py-2 bg-primary text-white rounded-lg text-sm">
+                                <i class="fa fa-plus mr-1"></i>
+                                添加任务
+                            </button>
+                        </div>
+
+                        <!-- 任务统计 -->
+                        <div class="bg-white mx-4 rounded-2xl shadow-lg px-4 py-3 mb-4">
+                            <div class="flex justify-between items-center text-sm">
+                                <div class="text-gray-600">
+                                    <span class="font-semibold text-primary">3</span> 个任务
+                                    <span class="ml-2 text-success">(<span>1</span> 已完成)</span>
+                                </div>
+                                <div class="flex space-x-2">
+                                    <button class="text-xs text-gray-600 px-2 py-1 border rounded">
+                                        <i class="fa fa-filter mr-1"></i>
+                                        筛选
+                                    </button>
+                                    <button class="text-xs text-gray-600 px-2 py-1 border rounded">
+                                        <i class="fa fa-sort mr-1"></i>
+                                        排序
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 任务列表 -->
+                        <div class="bg-white mx-4 rounded-2xl shadow-lg p-4 mb-4">
+                            <h2 class="text-sm font-bold text-gray-800 mb-3">任务列表</h2>
+                            
+                            <!-- 任务项 -->
+                            <div class="border-l-4 border-blue-500 border rounded-lg p-3 mb-2 bg-gray-50">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center space-x-2 flex-1">
+                                        <button class="w-4 h-4 rounded border-2 border-gray-300 flex items-center justify-center">
+                                        </button>
+                                        <div class="flex-1 min-w-0">
+                                            <p class="text-sm font-medium text-gray-800 truncate">完成项目文档编写</p>
+                                            <div class="flex items-center space-x-2 mt-1">
+                                                <span class="inline-block w-1.5 h-1.5 rounded-full bg-yellow-500"></span>
+                                                <span class="text-xs text-warning">今天</span>
+                                                <span class="text-xs text-gray-500">2小时前</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center space-x-1">
+                                        <button class="w-6 h-6 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100">
+                                            <i class="fa fa-pencil text-xs"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="border-l-4 border-blue-500 border rounded-lg p-3 mb-2 bg-gray-50">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center space-x-2 flex-1">
+                                        <button class="w-4 h-4 rounded border-2 border-gray-300 flex items-center justify-center">
+                                        </button>
+                                        <div class="flex-1 min-w-0">
+                                            <p class="text-sm font-medium text-gray-800 truncate">准备会议演示材料</p>
+                                            <div class="flex items-center space-x-2 mt-1">
+                                                <span class="inline-block w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                                                <span class="text-xs text-danger">已逾期</span>
+                                                <span class="text-xs text-gray-500">1天前</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center space-x-1">
+                                        <button class="w-6 h-6 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100">
+                                            <i class="fa fa-pencil text-xs"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="border-l-4 border-blue-500 border rounded-lg p-3 mb-2 bg-gray-50 task-completed">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center space-x-2 flex-1">
+                                        <button class="w-4 h-4 rounded border-2 bg-success border-success flex items-center justify-center">
+                                            <i class="fa fa-check text-white text-[6px]"></i>
+                                        </button>
+                                        <div class="flex-1 min-w-0">
+                                            <p class="text-sm font-medium text-gray-500 line-through truncate">回复客户邮件</p>
+                                            <div class="flex items-center space-x-2 mt-1">
+                                                <span class="inline-block w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                                                <span class="text-xs text-gray-500">昨天</span>
+                                                <span class="text-xs text-gray-500">3天前</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center space-x-1">
+                                        <button class="w-6 h-6 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100">
+                                            <i class="fa fa-pencil text-xs"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 底部导航 -->
+                        <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2">
+                            <div class="flex justify-around">
+                                <button class="flex flex-col items-center text-primary">
+                                    <i class="fa fa-home text-lg"></i>
+                                    <span class="text-xs mt-1">首页</span>
+                                </button>
+                                <button class="flex flex-col items-center text-gray-500">
+                                    <i class="fa fa-calendar text-lg"></i>
+                                    <span class="text-xs mt-1">日历</span>
+                                </button>
+                                <button class="flex flex-col items-center text-gray-500">
+                                    <i class="fa fa-bar-chart text-lg"></i>
+                                    <span class="text-xs mt-1">统计</span>
+                                </button>
+                                <button class="flex flex-col items-center text-gray-500">
+                                    <i class="fa fa-user text-lg"></i>
+                                    <span class="text-xs mt-1">我的</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 使用指南 -->
+        <section id="guide" class="mb-16">
+            <h3 class="text-3xl font-bold text-center text-gray-800 mb-8">移动端使用指南</h3>
+            
+            <div class="max-w-4xl mx-auto">
+                <div class="bg-white rounded-2xl shadow-lg p-6 mb-8">
+                    <h4 class="text-xl font-semibold text-gray-800 mb-4">方法一：本地开发环境访问</h4>
+                    
+                    <div class="space-y-4">
+                        <div class="flex items-start space-x-4">
+                            <div class="w-8 h-8 bg-primary text-white rounded-full flex items-center justify-center font-semibold flex-shrink-0">1</div>
+                            <div>
+                                <h5 class="font-medium text-gray-800 mb-1">启动本地服务器</h5>
+                                <p class="text-gray-600 mb-2">在项目目录下运行本地服务器：</p>
+                                <div class="bg-gray-50 p-3 rounded-lg font-mono text-sm">
+                                    python -m http.server 8000
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start space-x-4">
+                            <div class="w-8 h-8 bg-primary text-white rounded-full flex items-center justify-center font-semibold flex-shrink-0">2</div>
+                            <div>
+                                <h5 class="font-medium text-gray-800 mb-1">获取电脑IP地址</h5>
+                                <p class="text-gray-600">在命令提示符中运行 <code class="bg-gray-100 px-1 py-0.5 rounded">ipconfig</code> 找到IPv4地址（通常是192.168.x.x）</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start space-x-4">
+                            <div class="w-8 h-8 bg-primary text-white rounded-full flex items-center justify-center font-semibold flex-shrink-0">3</div>
+                            <div>
+                                <h5 class="font-medium text-gray-800 mb-1">在手机浏览器中访问</h5>
+                                <p class="text-gray-600">输入地址：<code class="bg-gray-100 px-1 py-0.5 rounded">http://你的电脑IP:8000</code></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-2xl shadow-lg p-6 mb-8">
+                    <h4 class="text-xl font-semibold text-gray-800 mb-4">方法二：部署到云服务</h4>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                            <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mb-4">
+                                <i class="fa fa-github text-2xl text-gray-700"></i>
+                            </div>
+                            <h5 class="font-semibold text-gray-800 mb-2">GitHub Pages</h5>
+                            <p class="text-sm text-gray-600">免费托管，支持静态网站，适合长期使用</p>
+                        </div>
+                        
+                        <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                            <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mb-4">
+                                <i class="fa fa-cloud text-2xl text-gray-700"></i>
+                            </div>
+                            <h5 class="font-semibold text-gray-800 mb-2">Netlify</h5>
+                            <p class="text-sm text-gray-600">一键部署，自动CI/CD，提供免费域名</p>
+                        </div>
+                        
+                        <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                            <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mb-4">
+                                <i class="fa fa-rocket text-2xl text-gray-700"></i>
+                            </div>
+                            <h5 class="font-semibold text-gray-800 mb-2">Vercel</h5>
+                            <p class="text-sm text-gray-600">专为前端优化，支持自动预览和部署</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 移动端特性 -->
+        <section class="mb-16">
+            <h3 class="text-3xl font-bold text-center text-gray-800 mb-8">移动端特性</h3>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
+                <div class="bg-white rounded-2xl shadow-lg p-6 text-center hover:transform hover:-translate-y-1 transition-transform">
+                    <div class="w-16 h-16 gradient-bg rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fa fa-mobile text-white text-2xl"></i>
+                    </div>
+                    <h4 class="text-lg font-semibold text-gray-800 mb-2">响应式设计</h4>
+                    <p class="text-gray-600">自动适应各种屏幕尺寸，提供最佳显示效果</p>
+                </div>
+                
+                <div class="bg-white rounded-2xl shadow-lg p-6 text-center hover:transform hover:-translate-y-1 transition-transform">
+                    <div class="w-16 h-16 gradient-bg rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fa fa-hand-pointer-o text-white text-2xl"></i>
+                    </div>
+                    <h4 class="text-lg font-semibold text-gray-800 mb-2">触摸优化</h4>
+                    <p class="text-gray-600">所有交互元素都经过优化，适合手指操作</p>
+                </div>
+                
+                <div class="bg-white rounded-2xl shadow-lg p-6 text-center hover:transform hover:-translate-y-1 transition-transform">
+                    <div class="w-16 h-16 gradient-bg rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fa fa-wifi text-white text-2xl"></i>
+                    </div>
+                    <h4 class="text-lg font-semibold text-gray-800 mb-2">离线工作</h4>
+                    <p class="text-gray-600">支持离线使用，网络恢复后自动同步数据</p>
+                </div>
+                
+                <div class="bg-white rounded-2xl shadow-lg p-6 text-center hover:transform hover:-translate-y-1 transition-transform">
+                    <div class="w-16 h-16 gradient-bg rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fa fa-bell text-white text-2xl"></i>
+                    </div>
+                    <h4 class="text-lg font-semibold text-gray-800 mb-2">推送通知</h4>
+                    <p class="text-gray-600">任务到期提醒，不错过任何重要事项</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 常见问题 -->
+        <section id="faq" class="mb-16">
+            <h3 class="text-3xl font-bold text-center text-gray-800 mb-8">常见问题</h3>
+            
+            <div class="max-w-3xl mx-auto space-y-4">
+                <div class="bg-white rounded-2xl shadow-lg p-6">
+                    <h4 class="text-lg font-semibold text-gray-800 mb-2">如何将TaskPool添加到手机主屏幕？</h4>
+                    <p class="text-gray-600">
+                        <strong>Android (Chrome)：</strong> 打开网站 → 点击菜单按钮 → 选择"添加到主屏幕"<br>
+                        <strong>iOS (Safari)：</strong> 打开网站 → 点击分享按钮 → 选择"添加到主屏幕"
+                    </p>
+                </div>
+                
+                <div class="bg-white rounded-2xl shadow-lg p-6">
+                    <h4 class="text-lg font-semibold text-gray-800 mb-2">移动端和桌面端数据会自动同步吗？</h4>
+                    <p class="text-gray-600">
+                        是的，只要在相同设备上登录相同账号，或者配置了GitHub同步，数据会自动在不同端之间同步。
+                    </p>
+                </div>
+                
+                <div class="bg-white rounded-2xl shadow-lg p-6">
+                    <h4 class="text-lg font-semibold text-gray-800 mb-2">移动端支持哪些浏览器？</h4>
+                    <p class="text-gray-600">
+                        推荐使用最新版本的Chrome、Safari、Firefox或Edge浏览器，以获得最佳体验。
+                    </p>
+                </div>
+                
+                <div class="bg-white rounded-2xl shadow-lg p-6">
+                    <h4 class="text-lg font-semibold text-gray-800 mb-2">离线时可以使用哪些功能？</h4>
+                    <p class="text-gray-600">
+                        离线时可以正常添加、编辑、删除任务，查看任务列表。所有操作会在网络恢复后自动同步到云端。
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 行动召唤 -->
+        <section class="text-center">
+            <h3 class="text-3xl font-bold text-gray-800 mb-4">开始在移动端使用TaskPool</h3>
+            <p class="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
+                无论您在哪里，都能随时管理任务。立即在您的手机上体验TaskPool的便捷功能。
+            </p>
+            <div class="flex flex-col md:flex-row justify-center items-center space-y-4 md:space-y-0 md:space-x-6">
+                <a href="index.html" class="px-8 py-3 bg-primary hover:bg-blue-600 text-white rounded-lg transition-colors flex items-center justify-center">
+                    <i class="fa fa-mobile mr-2"></i>
+                    立即体验移动端
+                </a>
+                <a href="MOBILE_ACCESS_GUIDE.md" class="px-8 py-3 border border-gray-300 hover:border-primary text-gray-700 hover:text-primary rounded-lg transition-colors flex items-center justify-center">
+                    <i class="fa fa-download mr-2"></i>
+                    下载详细指南
+                </a>
+            </div>
+        </section>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="bg-gray-800 text-white py-8">
+        <div class="container mx-auto px-4">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="flex items-center space-x-3 mb-4 md:mb-0">
+                    <div class="w-10 h-10 bg-gradient-to-r from-primary to-purple-500 rounded-lg flex items-center justify-center">
+                        <i class="fa fa-tasks text-white text-xl"></i>
+                    </div>
+                    <h2 class="text-xl font-bold">TaskPool</h2>
+                </div>
+                <div class="flex space-x-6">
+                    <a href="index.html" class="text-gray-300 hover:text-white transition-colors">首页</a>
+                    <a href="MOBILE_ACCESS_GUIDE.md" class="text-gray-300 hover:text-white transition-colors">使用指南</a>
+                    <a href="#" class="text-gray-300 hover:text-white transition-colors">关于我们</a>
+                </div>
+            </div>
+            <div class="border-t border-gray-700 mt-6 pt-6 text-center text-gray-400 text-sm">
+                <p>&copy; 2024 TaskPool. 保留所有权利。</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

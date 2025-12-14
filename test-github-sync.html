@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub同步测试</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.3.0/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-lg p-8 max-w-md w-full">
+        <h1 class="text-2xl font-bold text-center mb-6">GitHub同步测试</h1>
+        
+        <div id="test-results" class="space-y-4">
+            <div id="loading" class="text-center text-gray-500">
+                <div class="animate-pulse">正在测试GitHub同步功能...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 引入GitHub同步管理器 -->
+    <script src="GITHUB_SYNC_INTEGRATION.js"></script>
+    <!-- 引入应用配置 -->
+    <script src="app-config.js"></script>
+
+    <script>
+        // 测试函数
+        async function testGitHubSync() {
+            const resultsElement = document.getElementById('test-results');
+            const loadingElement = document.getElementById('loading');
+            
+            // 移除加载状态
+            loadingElement.remove();
+            
+            // 添加测试结果
+            function addResult(status, message) {
+                const div = document.createElement('div');
+                div.className = `p-3 rounded ${status === 'success' ? 'bg-green-50 text-green-800' : status === 'error' ? 'bg-red-50 text-red-800' : 'bg-yellow-50 text-yellow-800'}`;
+                div.innerHTML = `<strong>${status.toUpperCase()}:</strong> ${message}`;
+                resultsElement.appendChild(div);
+            }
+            
+            try {
+                // 1. 检查配置是否存在
+                if (typeof GITHUB_CONFIG === 'undefined') {
+                    addResult('error', '未找到GITHUB_CONFIG配置');
+                    return;
+                }
+                
+                if (!GITHUB_CONFIG.GITHUB_TOKEN || !GITHUB_CONFIG.GIST_ID) {
+                    addResult('error', 'GitHub Token或Gist ID配置不完整');
+                    return;
+                }
+                
+                addResult('success', 'GitHub配置已找到');
+                addResult('info', `Token: ${GITHUB_CONFIG.GITHUB_TOKEN.substring(0, 10)}...`);
+                addResult('info', `Gist ID: ${GITHUB_CONFIG.GIST_ID}`);
+                
+                // 2. 创建GitHubSyncManager实例
+                const syncManager = new GitHubSyncManager(GITHUB_CONFIG.GITHUB_TOKEN, GITHUB_CONFIG.GIST_ID);
+                addResult('success', 'GitHubSyncManager实例创建成功');
+                
+                // 3. 验证凭证
+                addResult('info', '正在验证GitHub凭证...');
+                const validationResult = await syncManager.validateCredentials();
+                
+                if (validationResult.valid) {
+                    addResult('success', validationResult.message);
+                    
+                    // 4. 测试获取远程数据
+                    addResult('info', '正在测试获取远程数据...');
+                    const remoteData = await syncManager.fetchRemoteData();
+                    if (remoteData) {
+                        addResult('success', '成功获取远程数据');
+                        addResult('info', `数据类型: ${typeof remoteData}`);
+                        if (Array.isArray(remoteData)) {
+                            addResult('info', `任务数量: ${remoteData.length}`);
+                        } else if (remoteData.tasks) {
+                            addResult('info', `任务数量: ${remoteData.tasks.length}`);
+                        }
+                    } else {
+                        addResult('warning', '远程数据为空');
+                    }
+                    
+                } else {
+                    addResult('error', validationResult.message);
+                }
+                
+            } catch (error) {
+                addResult('error', `测试过程中出错: ${error.message}`);
+                console.error('测试错误:', error);
+            }
+        }
+        
+        // 页面加载完成后执行测试
+        window.addEventListener('load', testGitHubSync);
+    </script>
+</body>
+</html>

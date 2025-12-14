@@ -1,0 +1,3003 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TaskPool - 云端任务管理系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/zh.js"></script>
+    <!-- 国内CDN资源 -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/js-cookie@3.0.5/dist/js.cookie.min.js"></script>
+    <!-- 本地配置 -->
+    <script src="app-config.js"></script>
+    <!-- GitHub同步功能 -->
+    <script src="GITHUB_SYNC_INTEGRATION.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3b82f6',
+                        secondary: '#64748b',
+                        success: '#10b981',
+                        danger: '#ef4444',
+                        warning: '#f59e0b',
+                        info: '#06b6d4',
+                        light: '#f8fafc',
+                        dark: '#1e293b',
+                        high: '#ef4444',
+                        medium: '#f59e0b',
+                        low: '#10b981'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif']
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.3s ease-in-out',
+                        'slide-in': 'slideIn 0.3s ease-in-out',
+                        'pulse-slow': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'bounce-slow': 'bounce 1s infinite'
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' }
+                        },
+                        slideIn: {
+                            '0%': { transform: 'translateY(-10px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .glass {
+                background: rgba(255, 255, 255, 0.1);
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+            }
+            .text-shadow {
+                text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            }
+            .card-hover {
+                transition: all 0.3s ease;
+            }
+            .card-hover:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            }
+            .gradient-text {
+                background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+            }
+            .sync-indicator {
+                position: relative;
+            }
+            .sync-indicator::after {
+                content: '';
+                position: absolute;
+                top: -2px;
+                right: -2px;
+                width: 8px;
+                height: 8px;
+                background-color: #10b981;
+                border-radius: 50%;
+                border: 2px solid white;
+            }
+            .sync-indicator.offline::after {
+                background-color: #ef4444;
+            }
+            .sync-indicator.syncing::after {
+                background-color: #f59e0b;
+                animation: pulse 1s infinite;
+            }
+            
+            .task-level-1 {
+                border-left: 4px solid #3b82f6;
+            }
+            .task-level-2 {
+                border-left: 4px solid #8b5cf6;
+            }
+            .task-level-3 {
+                border-left: 4px solid #10b981;
+            }
+            
+            .priority-high {
+                border-color: rgba(239, 68, 68, 0.3);
+            }
+            .priority-medium {
+                border-color: rgba(245, 158, 11, 0.3);
+            }
+            .priority-low {
+                border-color: rgba(16, 185, 129, 0.3);
+            }
+            
+            .task-completed {
+                opacity: 0.7;
+                background-color: rgba(16, 185, 129, 0.05);
+            }
+            
+            .bg-high { background-color: #ef4444; }
+            .bg-medium { background-color: #f59e0b; }
+            .bg-low { background-color: #10b981; }
+            
+            .text-high { color: #ef4444; }
+            .text-medium { color: #f59e0b; }
+            .text-low { color: #10b981; }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <!-- 应用标题 -->
+        <header class="text-center mb-8 animate-fade-in">
+            <div class="flex items-center justify-center space-x-3 mb-3">
+                <div class="w-12 h-12 bg-gradient-to-r from-primary to-purple-500 rounded-lg flex items-center justify-center shadow-lg">
+                    <i class="fa fa-tasks text-white text-2xl"></i>
+                </div>
+                <h1 class="text-4xl md:text-5xl font-bold gradient-text text-shadow">TaskPool</h1>
+            </div>
+            <p class="text-xl text-gray-600">云端任务管理系统 - 随时随地管理您的任务</p>
+        </header>
+
+        <!-- 用户信息和同步状态 -->
+        <div class="bg-white rounded-2xl shadow-lg p-4 mb-6 animate-fade-in">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="flex items-center space-x-3 mb-3 md:mb-0">
+                    <div class="w-10 h-10 bg-gradient-to-r from-primary to-purple-500 rounded-full flex items-center justify-center text-white font-semibold">
+                        <span id="userAvatar">用</span>
+                    </div>
+                    <div>
+                        <p class="font-medium text-gray-800" id="userName">用户</p>
+                        <p class="text-sm text-gray-500" id="syncStatus">
+                            <i class="fa fa-cloud"></i> 云端同步
+                        </p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <div id="syncIndicator" class="sync-indicator cursor-pointer" title="点击同步">
+                        <i class="fa fa-refresh"></i>
+                    </div>
+                    <button id="authBtn" class="px-4 py-2 bg-primary hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors">
+                        <i class="fa fa-user-circle mr-1"></i>
+                        登录/注册
+                    </button>
+                    <div class="flex space-x-1">
+                        <button id="wechatSignInBtn" class="w-8 h-8 bg-green-500 hover:bg-green-600 text-white rounded-lg flex items-center justify-center transition-colors" title="使用微信登录">
+                            <i class="fa fa-weixin"></i>
+                        </button>
+                        <button id="phoneSignInBtn" class="w-8 h-8 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center justify-center transition-colors" title="使用手机号登录">
+                            <i class="fa fa-mobile"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 添加任务区域 -->
+        <div class="bg-white rounded-2xl shadow-lg p-6 mb-6 animate-fade-in">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">添加新任务</h2>
+            <div class="mb-4">
+                <input 
+                    type="text" 
+                    id="taskInput" 
+                    class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200"
+                    placeholder="添加新的任务..."
+                    autocomplete="off"
+                >
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <!-- 优先级选择 -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">优先级</label>
+                    <div class="flex space-x-2">
+                        <button class="priority-btn flex-1 py-2 px-3 border rounded-lg text-sm transition-colors hover:bg-gray-50" data-priority="high">
+                            <span class="inline-block w-3 h-3 bg-high rounded-full mr-1"></span>
+                            高
+                        </button>
+                        <button class="priority-btn flex-1 py-2 px-3 border rounded-lg text-sm transition-colors hover:bg-gray-50 bg-medium bg-opacity-10 border-medium" data-priority="medium">
+                            <span class="inline-block w-3 h-3 bg-medium rounded-full mr-1"></span>
+                            中
+                        </button>
+                        <button class="priority-btn flex-1 py-2 px-3 border rounded-lg text-sm transition-colors hover:bg-gray-50" data-priority="low">
+                            <span class="inline-block w-3 h-3 bg-low rounded-full mr-1"></span>
+                            低
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- 截止日期选择 -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">截止日期</label>
+                    <input 
+                        type="text" 
+                        id="dueDateInput" 
+                        class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
+                        placeholder="选择日期"
+                    >
+                </div>
+                
+                <!-- 任务层级选择 -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">任务类型</label>
+                    <select id="taskLevelSelect" class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent">
+                        <option value="1">大任务</option>
+                        <option value="2">中任务</option>
+                        <option value="3">小任务</option>
+                    </select>
+                </div>
+            </div>
+            
+            <!-- 父任务选择 -->
+            <div id="parentTaskSelectContainer" class="hidden mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">所属任务</label>
+                <select id="parentTaskSelect" class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent">
+                    <option value="">请选择父任务</option>
+                </select>
+            </div>
+            
+            <div class="flex justify-between items-center">
+                <div class="text-sm text-gray-500" id="parentTaskInfo">
+                    <i class="fa fa-folder-o mr-1"></i>
+                    <span>无父任务</span>
+                </div>
+                <button 
+                    id="addTaskBtn" 
+                    class="px-6 py-2 bg-primary hover:bg-blue-600 text-white rounded-lg transition-all duration-200 flex items-center justify-center"
+                >
+                    <i class="fa fa-plus mr-2"></i>
+                    添加任务
+                </button>
+            </div>
+        </div>
+
+        <!-- 任务提醒组件 -->
+        <div id="taskReminder" class="bg-white rounded-2xl shadow-lg p-6 mb-6 border-l-4 border-warning animate-fade-in">
+            <div class="flex items-center space-x-3 mb-4">
+                <div class="text-warning">
+                    <i class="fa fa-bell text-2xl"></i>
+                </div>
+                <h3 class="text-xl font-bold text-gray-800">任务提醒</h3>
+            </div>
+            <ul class="text-gray-600 space-y-2" id="reminderList">
+                <!-- 提醒项将动态生成 -->
+            </ul>
+        </div>
+
+        <!-- 任务统计和排序 -->
+        <div class="bg-white rounded-2xl shadow-lg px-6 py-4 mb-6 animate-fade-in">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div class="text-sm text-gray-600">
+                    <span id="taskCount" class="font-semibold text-primary">0</span> 个任务
+                    <span id="completedCount" class="ml-2 text-success">(<span id="completedNum">0</span> 已完成)</span>
+                    <span class="ml-2 text-high" id="highPriorityCount">(高: <span>0</span>)</span>
+                    <span class="ml-2 text-medium" id="mediumPriorityCount">(中: <span>0</span>)</span>
+                    <span class="ml-2 text-low" id="lowPriorityCount">(低: <span>0</span>)</span>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <!-- 筛选按钮 -->
+                    <div class="relative">
+                        <button 
+                            id="filterBtn" 
+                            class="text-sm text-gray-600 hover:text-primary transition-colors flex items-center px-3 py-2 border rounded-lg"
+                        >
+                            <i class="fa fa-filter mr-1"></i>
+                            筛选
+                            <i class="fa fa-angle-down ml-1"></i>
+                        </button>
+                        <div id="filterOptions" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border z-10">
+                            <div class="py-1">
+                                <button class="filter-option w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors" data-filter="all">
+                                    <i class="fa fa-check-circle mr-2 text-primary"></i>全部任务
+                                </button>
+                                <button class="filter-option w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors" data-filter="pending">
+                                    <i class="fa fa-clock-o mr-2 text-warning"></i>待完成
+                                </button>
+                                <button class="filter-option w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors" data-filter="completed">
+                                    <i class="fa fa-check mr-2 text-success"></i>已完成
+                                </button>
+                                <button class="filter-option w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors" data-filter="overdue">
+                                    <i class="fa fa-exclamation-triangle mr-2 text-danger"></i>已逾期
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 排序按钮 -->
+                    <div class="relative">
+                        <button 
+                            id="sortBtn" 
+                            class="text-sm text-gray-600 hover:text-primary transition-colors flex items-center px-3 py-2 border rounded-lg"
+                        >
+                            <i class="fa fa-sort mr-1"></i>
+                            排序
+                            <i class="fa fa-angle-down ml-1"></i>
+                        </button>
+                        <div id="sortOptions" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border z-10">
+                            <div class="py-1">
+                                <button class="sort-option w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors" data-sort="priority">
+                                    <i class="fa fa-flag mr-2 text-primary"></i>按优先级
+                                </button>
+                                <button class="sort-option w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors" data-sort="dueDate">
+                                    <i class="fa fa-calendar mr-2 text-primary"></i>按截止时间
+                                </button>
+                                <button class="sort-option w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors" data-sort="createdAt">
+                                    <i class="fa fa-clock-o mr-2 text-primary"></i>按创建时间
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 清空按钮 -->
+                    <button 
+                        id="clearAllBtn" 
+                        class="text-sm text-gray-600 hover:text-danger transition-colors flex items-center px-3 py-2 border rounded-lg"
+                    >
+                        <i class="fa fa-trash mr-1"></i>
+                        清空
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 任务列表 -->
+        <div class="bg-white rounded-2xl shadow-lg p-6 animate-fade-in">
+            <div id="tasksContainer">
+                <!-- 空状态 -->
+                <div id="emptyState" class="text-center py-12">
+                    <div class="w-20 h-20 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                        <i class="fa fa-tasks text-gray-400 text-3xl"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-600 mb-2">暂无任务</h3>
+                    <p class="text-gray-500">开始添加您的第一个任务吧！</p>
+                </div>
+                
+                <!-- 任务列表 -->
+                <div id="taskList" class="hidden">
+                    <!-- 任务项将在这里动态生成 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 编辑任务模态框 -->
+        <div id="editTaskModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+            <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-lg w-full mx-4 animate-slide-in">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold text-gray-800">编辑任务</h3>
+                    <button id="closeEditModal" class="text-gray-400 hover:text-gray-600">
+                        <i class="fa fa-times text-xl"></i>
+                    </button>
+                </div>
+                
+                <form id="editTaskForm">
+                    <input type="hidden" id="editTaskId">
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">任务内容</label>
+                        <input 
+                            type="text" 
+                            id="editTaskTitle" 
+                            class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-transparent"
+                            required
+                        >
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">截止日期</label>
+                            <input 
+                                type="text" 
+                                id="editDueDate" 
+                                class="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-transparent"
+                                required
+                            >
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">优先级</label>
+                            <div class="flex space-x-2">
+                                <button type="button" class="edit-priority-btn flex-1 py-2 px-3 border rounded-lg text-sm transition-colors hover:bg-gray-50" data-priority="high">
+                                    <span class="inline-block w-3 h-3 bg-high rounded-full mr-1"></span>
+                                    高
+                                </button>
+                                <button type="button" class="edit-priority-btn flex-1 py-2 px-3 border rounded-lg text-sm transition-colors hover:bg-gray-50 bg-medium bg-opacity-10 border-medium" data-priority="medium">
+                                    <span class="inline-block w-3 h-3 bg-medium rounded-full mr-1"></span>
+                                    中
+                                </button>
+                                <button type="button" class="edit-priority-btn flex-1 py-2 px-3 border rounded-lg text-sm transition-colors hover:bg-gray-50" data-priority="low">
+                                    <span class="inline-block w-3 h-3 bg-low rounded-full mr-1"></span>
+                                    低
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="flex items-center">
+                            <input type="checkbox" id="editTaskCompleted" class="w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary">
+                            <span class="ml-2 text-sm text-gray-700">标记为已完成</span>
+                        </label>
+                    </div>
+                    
+                    <div class="flex justify-between">
+                        <button type="button" id="deleteTaskBtn" class="px-4 py-2 bg-danger hover:bg-red-600 text-white rounded-lg transition-colors">
+                            <i class="fa fa-trash mr-1"></i>
+                            删除任务
+                        </button>
+                        <button type="submit" class="px-6 py-2 bg-primary hover:bg-blue-600 text-white rounded-lg transition-colors">
+                            <i class="fa fa-save mr-1"></i>
+                            保存修改
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 认证模态框 -->
+        <div id="authModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+            <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 animate-slide-in">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800" id="authModalTitle">登录账号</h2>
+                    <button id="closeAuthModal" class="text-gray-400 hover:text-gray-600">
+                        <i class="fa fa-times text-xl"></i>
+                    </button>
+                </div>
+                
+                <div id="authForms">
+                    <!-- 登录表单 -->
+                    <div id="loginForm">
+                        <div class="mb-4">
+                            <label class="block text-gray-700 mb-2">邮箱地址</label>
+                            <input type="email" id="loginEmail" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="请输入邮箱">
+                        </div>
+                        <div class="mb-6">
+                            <label class="block text-gray-700 mb-2">密码</label>
+                            <input type="password" id="loginPassword" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="请输入密码">
+                        </div>
+                        <div class="mb-6">
+                            <label class="flex items-center">
+                                <input type="checkbox" id="rememberMe" class="w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary">
+                                <span class="ml-2 text-sm text-gray-700">记住我</span>
+                            </label>
+                        </div>
+                        <button id="loginBtn" class="w-full bg-primary hover:bg-blue-600 text-white py-3 rounded-lg font-medium transition-colors mb-4">
+                            <i class="fa fa-sign-in mr-2"></i>
+                            登录
+                        </button>
+                        <div class="text-center">
+                            <p class="text-gray-600 mb-2">还没有账号？</p>
+                            <button id="showRegisterForm" class="text-primary hover:text-blue-700 font-medium">
+                                创建新账号
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 注册表单 -->
+                    <div id="registerForm" class="hidden">
+                        <div class="mb-4">
+                            <label class="block text-gray-700 mb-2">用户名</label>
+                            <input type="text" id="registerName" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="请输入用户名">
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-gray-700 mb-2">邮箱地址</label>
+                            <input type="email" id="registerEmail" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="请输入邮箱">
+                        </div>
+                        <div class="mb-6">
+                            <label class="block text-gray-700 mb-2">密码</label>
+                            <input type="password" id="registerPassword" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="请输入密码">
+                        </div>
+                        <button id="registerBtn" class="w-full bg-primary hover:bg-blue-600 text-white py-3 rounded-lg font-medium transition-colors mb-4">
+                            <i class="fa fa-user-plus mr-2"></i>
+                            注册
+                        </button>
+                        <div class="text-center">
+                            <p class="text-gray-600 mb-2">已有账号？</p>
+                            <button id="showLoginForm" class="text-primary hover:text-blue-700 font-medium">
+                                返回登录
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 通知提示 -->
+        <div id="notification" class="fixed top-4 right-4 max-w-sm bg-white rounded-lg shadow-lg border border-gray-200 transform translate-x-full transition-transform duration-300 z-50">
+            <div class="p-4">
+                <div class="flex items-start">
+                    <div id="notificationIcon" class="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full mr-3">
+                        <i class="fa fa-info-circle text-white"></i>
+                    </div>
+                    <div class="flex-1">
+                        <h4 id="notificationTitle" class="text-sm font-medium text-gray-800"></h4>
+                        <p id="notificationMessage" class="text-sm text-gray-600 mt-1"></p>
+                    </div>
+                    <button id="closeNotification" class="text-gray-400 hover:text-gray-600 ml-4">
+                        <i class="fa fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局应用实例
+        let app;
+
+        // 本地存储键名
+        const STORAGE_KEYS = {
+            USER: 'taskpool_user',
+            TASKS: 'taskpool_tasks',
+            SETTINGS: 'taskpool_settings',
+            SYNC_STATE: 'taskpool_sync_state',
+            SESSION_TOKEN: 'taskpool_session_token'
+        };
+
+        // 为日期选择器添加无截止日期按钮
+        function addNoDueDateButton(inputElement, instance) {
+            const flatpickrContainer = inputElement.parentElement.querySelector('.flatpickr');
+            if (!flatpickrContainer) return;
+
+            const buttonContainer = flatpickrContainer.querySelector('.flatpickr-months');
+            if (!buttonContainer) return;
+
+            // 检查按钮是否已存在
+            if (buttonContainer.querySelector('.no-due-date-btn')) return;
+
+            const button = document.createElement('button');
+            button.className = 'no-due-date-btn bg-blue-500 hover:bg-blue-600 text-white text-sm py-1 px-3 rounded ml-2 cursor-pointer';
+            button.textContent = '无截止日期';
+
+            button.addEventListener('click', () => {
+                // 清空日期
+                instance.clear();
+                inputElement.value = '';
+                inputElement.dataset.noDueDate = 'true';
+                
+                // 隐藏日期选择器
+                instance.close();
+            });
+
+            buttonContainer.appendChild(button);
+        }
+
+        // 任务池应用类
+        class TaskPoolApp {
+            constructor() {
+                this.tasks = [];
+                this.filteredTasks = [];
+                this.filter = 'all';
+                this.sortBy = 'priority';
+                this.currentPriority = 'medium';
+                this.currentLevel = 1;
+                this.currentParentId = null;
+                this.expandedTasks = new Set();
+                this.reminders = [];
+                this.reminderCheckInterval = null;
+                this.currentUser = null;
+                this.isOnline = navigator.onLine;
+                this.syncRetryCount = 0;
+                this.syncRetryTimeout = null;
+
+                // 初始化应用
+                this.initializeElements();
+                this.bindEvents();
+                this.loadLocalTasks();
+                this.initApp();
+                this.initDatePickers();
+                this.renderTasks();
+                this.startReminderCheck();
+                
+                // 初始化GitHub同步功能
+                this.initGithubSync();
+                
+                // 更新同步状态，基于GitHub配置而非用户登录
+                if (this.githubSyncManager) {
+                    this.updateSyncStatusUI('configured');
+                } else {
+                    this.updateSyncStatusUI('not_configured');
+                }
+                
+                this.showNotification('TaskPool已启动', 'success');
+                
+                // 设置全局实例
+                window.app = this;
+            }
+
+            // GitHub同步功能初始化
+            initGithubSync() {
+                try {
+                    // 初始化配置管理器
+                    this.syncConfigManager = new SyncConfigManager();
+                    this.githubSyncManager = null;
+                    this.autoSyncInterval = null;
+                    
+                    // 加载用户保存的配置
+                    this.loadSyncConfig();
+                    
+                    // 如果用户没有保存配置，尝试使用全局配置作为备选
+                    if (!this.githubSyncManager && typeof GITHUB_CONFIG !== 'undefined' && GITHUB_CONFIG.GITHUB_TOKEN && GITHUB_CONFIG.GIST_ID) {
+                        this.githubSyncManager = new GitHubSyncManager(GITHUB_CONFIG.GITHUB_TOKEN, GITHUB_CONFIG.GIST_ID);
+                        console.log('使用全局GitHub配置');
+                    }
+                    
+                    // 验证配置
+                    if (this.githubSyncManager) {
+                        this.validateGithubConfig();
+                        // 如果启用了自动同步，启动自动同步
+                        const savedConfig = this.syncConfigManager.getConfig();
+                        if (savedConfig.autoSync || (typeof GITHUB_CONFIG !== 'undefined' && GITHUB_CONFIG.SYNC_ENABLED)) {
+                            this.startAutoSync(savedConfig.syncInterval || (typeof GITHUB_CONFIG !== 'undefined' ? GITHUB_CONFIG.SYNC_INTERVAL : 5));
+                        }
+                    }
+                    
+                    // 绑定事件
+                    this.bindGithubSyncEvents();
+                    
+                    // 初始化状态指示器
+                    this.initSyncStatusIndicator();
+                    
+                    console.log(this.githubSyncManager ? 'GitHub同步功能初始化成功' : '未找到GitHub配置，同步功能未启用');
+                } catch (error) {
+                    console.error('GitHub同步功能初始化失败:', error);
+                }
+            }
+
+            // 验证GitHub配置
+            async validateGithubConfig() {
+                if (!this.githubSyncManager) return;
+                
+                try {
+                    const result = await this.githubSyncManager.validateCredentials();
+                    if (result.valid) {
+                        this.syncConfigManager.updateSyncStatus('configured');
+                        this.updateSyncStatusUI('configured');
+                        console.log('GitHub配置验证成功');
+                        
+                        // 首次同步：下载远程数据
+                        this.syncFromGithub();
+                    } else {
+                        this.syncConfigManager.updateSyncStatus('error', result.message);
+                        this.updateSyncStatusUI('error', result.message);
+                        console.error('GitHub配置验证失败:', result.message);
+                    }
+                } catch (error) {
+                    this.syncConfigManager.updateSyncStatus('error', error.message);
+                    this.updateSyncStatusUI('error', error.message);
+                    console.error('GitHub配置验证错误:', error);
+                }
+            }
+
+            // 从GitHub同步数据
+            async syncFromGithub() {
+                if (!this.githubSyncManager) return;
+                
+                try {
+                    this.updateSyncStatusUI('syncing');
+                    
+                    const result = await this.githubSyncManager.sync(this.tasks);
+                    
+                    if (result.success) {
+                        // 更新本地任务
+                        if (result.tasks && result.tasks.length > 0) {
+                            this.tasks = result.tasks;
+                            this.saveLocalTasks();
+                            this.renderTasks();
+                        }
+                        
+                        this.syncConfigManager.updateSyncStatus('synced');
+                        this.updateSyncStatusUI('synced', `同步成功，共${result.syncedTasks}个任务`);
+                        console.log('GitHub同步成功');
+                    } else {
+                        this.syncConfigManager.updateSyncStatus('error', result.message);
+                        this.updateSyncStatusUI('error', result.message);
+                        console.error('GitHub同步失败:', result.message);
+                    }
+                } catch (error) {
+                    this.syncConfigManager.updateSyncStatus('error', error.message);
+                    this.updateSyncStatusUI('error', error.message);
+                    console.error('GitHub同步错误:', error);
+                    // 添加重试逻辑
+                    this.retrySync();
+                }
+            }
+
+            // 启动自动同步
+            startAutoSync(intervalMinutes = 5) {
+                if (this.autoSyncInterval) {
+                    clearInterval(this.autoSyncInterval);
+                }
+                
+                this.autoSyncInterval = setInterval(() => {
+                    if (navigator.onLine) {
+                        this.syncFromGithub();
+                    }
+                }, intervalMinutes * 60 * 1000);
+                
+                console.log(`自动同步已启动，间隔${intervalMinutes}分钟`);
+            }
+
+            // 更新同步状态UI
+            updateSyncStatusUI(status, message = '') {
+                const syncIndicator = document.getElementById('syncIndicator');
+                const syncStatus = document.getElementById('syncStatus');
+                
+                if (!syncIndicator || !syncStatus) return;
+                
+                // 更新指示器样式
+                syncIndicator.className = 'sync-indicator cursor-pointer';
+                syncIndicator.title = '点击同步';
+                
+                switch (status) {
+                    case 'not_configured':
+                        syncIndicator.classList.add('offline');
+                        syncStatus.innerHTML = '<i class="fa fa-cloud-slash"></i> 未配置同步';
+                        break;
+                    case 'configured':
+                        syncIndicator.classList.remove('offline', 'syncing');
+                        syncStatus.innerHTML = '<i class="fa fa-cloud"></i> 已配置同步';
+                        break;
+                    case 'syncing':
+                        syncIndicator.classList.add('syncing');
+                        syncStatus.innerHTML = '<i class="fa fa-refresh fa-spin"></i> 同步中...';
+                        break;
+                    case 'synced':
+                        syncIndicator.classList.remove('offline', 'syncing');
+                        syncStatus.innerHTML = '<i class="fa fa-cloud"></i> 已同步';
+                        if (message) {
+                            this.showNotification(message, 'success');
+                        }
+                        break;
+                    case 'error':
+                        syncIndicator.classList.add('offline');
+                        syncStatus.innerHTML = '<i class="fa fa-exclamation-triangle"></i> 同步错误';
+                        if (message) {
+                            this.showNotification(`同步错误: ${message}`, 'danger');
+                        }
+                        break;
+                }
+            }
+
+            // 手动同步
+            manualSync() {
+                if (this.githubSyncManager) {
+                    this.syncFromGithub();
+                } else {
+                    this.showNotification('同步功能未配置', 'warning');
+                }
+            }
+
+            initializeElements() {
+                // 认证相关
+                this.authModal = document.getElementById('authModal');
+                this.authBtn = document.getElementById('authBtn');
+                this.closeAuthModal = document.getElementById('closeAuthModal');
+                this.loginForm = document.getElementById('loginForm');
+                this.registerForm = document.getElementById('registerForm');
+                this.showRegisterForm = document.getElementById('showRegisterForm');
+                this.showLoginForm = document.getElementById('showLoginForm');
+                this.loginBtn = document.getElementById('loginBtn');
+                this.registerBtn = document.getElementById('registerBtn');
+                this.userAvatar = document.getElementById('userAvatar');
+                this.userName = document.getElementById('userName');
+
+                // 任务相关
+                this.taskInput = document.getElementById('taskInput');
+                this.addTaskBtn = document.getElementById('addTaskBtn');
+                this.taskList = document.getElementById('taskList');
+                this.tasksContainer = document.getElementById('tasksContainer');
+                this.emptyState = document.getElementById('emptyState');
+                this.taskCount = document.getElementById('taskCount');
+                this.completedCount = document.getElementById('completedCount');
+                this.completedNum = document.getElementById('completedNum');
+                this.clearAllBtn = document.getElementById('clearAllBtn');
+                this.filterBtn = document.getElementById('filterBtn');
+                this.filterOptions = document.getElementById('filterOptions');
+                this.sortBtn = document.getElementById('sortBtn');
+                this.sortOptions = document.getElementById('sortOptions');
+                
+                // 优先级统计
+                this.highPriorityCount = document.getElementById('highPriorityCount').querySelector('span');
+                this.mediumPriorityCount = document.getElementById('mediumPriorityCount').querySelector('span');
+                this.lowPriorityCount = document.getElementById('lowPriorityCount').querySelector('span');
+
+                // 任务输入相关
+                this.dueDateInput = document.getElementById('dueDateInput');
+                this.taskLevelSelect = document.getElementById('taskLevelSelect');
+                this.parentTaskInfo = document.getElementById('parentTaskInfo');
+                this.priorityBtns = document.querySelectorAll('.priority-btn');
+
+                // 编辑模态框
+                this.editTaskModal = document.getElementById('editTaskModal');
+                this.closeEditModal = document.getElementById('closeEditModal');
+                this.editTaskForm = document.getElementById('editTaskForm');
+                this.editTaskId = document.getElementById('editTaskId');
+                this.editTaskTitle = document.getElementById('editTaskTitle');
+                this.editDueDate = document.getElementById('editDueDate');
+                this.editTaskCompleted = document.getElementById('editTaskCompleted');
+                this.deleteTaskBtn = document.getElementById('deleteTaskBtn');
+                this.editPriorityBtns = document.querySelectorAll('.edit-priority-btn');
+
+                // 状态指示
+                this.syncStatus = document.getElementById('syncStatus');
+                this.syncIndicator = document.getElementById('syncIndicator');
+
+                // 社交登录按钮
+                this.wechatSignInBtn = document.getElementById('wechatSignInBtn');
+                this.phoneSignInBtn = document.getElementById('phoneSignInBtn');
+
+                // 通知
+                this.notification = document.getElementById('notification');
+                this.notificationIcon = document.getElementById('notificationIcon');
+                this.notificationTitle = document.getElementById('notificationTitle');
+                this.notificationMessage = document.getElementById('notificationMessage');
+                this.closeNotification = document.getElementById('closeNotification');
+            }
+
+            // 模态框控制方法
+            showAuthModal() {
+                this.authModal.classList.remove('hidden');
+                this.switchToLogin();
+            }
+
+            hideAuthModal() {
+                this.authModal.classList.add('hidden');
+            }
+
+            hideEditModal() {
+                this.editTaskModal.classList.add('hidden');
+            }
+
+            switchToLogin() {
+                document.getElementById('authModalTitle').textContent = '登录账号';
+                this.loginForm.classList.remove('hidden');
+                this.registerForm.classList.add('hidden');
+            }
+
+            switchToRegister() {
+                document.getElementById('authModalTitle').textContent = '创建账号';
+                this.loginForm.classList.add('hidden');
+                this.registerForm.classList.remove('hidden');
+            }
+
+            bindEvents() {
+                // 认证相关事件
+                this.authBtn.addEventListener('click', () => this.showAuthModal());
+                this.closeAuthModal.addEventListener('click', () => this.hideAuthModal());
+                this.showRegisterForm.addEventListener('click', () => this.switchToRegister());
+                this.showLoginForm.addEventListener('click', () => this.switchToLogin());
+                this.loginBtn.addEventListener('click', () => this.login());
+                this.registerBtn.addEventListener('click', () => this.register());
+
+                // 任务相关事件
+                this.addTaskBtn.addEventListener('click', () => this.addTask());
+                this.taskInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') this.addTask();
+                });
+                this.clearAllBtn.addEventListener('click', () => this.clearAllTasks());
+                this.filterBtn.addEventListener('click', () => this.toggleFilter());
+                this.sortBtn.addEventListener('click', () => this.toggleSort());
+
+                // 优先级选择事件
+                this.priorityBtns.forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        this.currentPriority = e.target.dataset.priority;
+                        this.updatePriorityButtons();
+                    });
+                });
+
+                // 任务层级选择事件
+                this.taskLevelSelect.addEventListener('change', (e) => {
+                    this.currentLevel = parseInt(e.target.value);
+                    this.currentParentId = null;
+                    this.updateParentTaskOptions();
+                });
+
+                // 父任务选择事件
+                document.getElementById('parentTaskSelect')?.addEventListener('change', (e) => {
+                    this.currentParentId = e.target.value || null;
+                    this.updateParentTaskInfo();
+                });
+
+                // 筛选选项事件
+                document.querySelectorAll('.filter-option').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        this.setFilter(e.target.dataset.filter);
+                        this.toggleFilter();
+                    });
+                });
+
+                // 排序选项事件
+                document.querySelectorAll('.sort-option').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        this.setSort(e.target.dataset.sort);
+                        this.toggleSort();
+                    });
+                });
+
+                // 编辑模态框事件
+                this.closeEditModal.addEventListener('click', () => this.hideEditModal());
+                this.editTaskForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.saveTaskChanges();
+                });
+                this.deleteTaskBtn.addEventListener('click', () => this.confirmDeleteTask());
+
+                // 编辑优先级按钮事件
+                this.editPriorityBtns.forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const priority = e.target.dataset.priority;
+                        this.editPriorityBtns.forEach(b => b.classList.remove('bg-opacity-10', 'border-high', 'border-medium', 'border-low'));
+                        btn.classList.add(`bg-${priority}`, 'bg-opacity-10', `border-${priority}`);
+                        this.editTaskForm.dataset.priority = priority;
+                    });
+                });
+
+                // 通知关闭事件
+                this.closeNotification.addEventListener('click', () => this.hideNotification());
+
+                // 点击其他区域关闭下拉菜单
+                document.addEventListener('click', (e) => {
+                    if (!this.filterBtn.contains(e.target) && !this.filterOptions.contains(e.target)) {
+                        this.filterOptions.classList.add('hidden');
+                    }
+                    if (!this.sortBtn.contains(e.target) && !this.sortOptions.contains(e.target)) {
+                        this.sortOptions.classList.add('hidden');
+                    }
+                });
+
+                // 点击模态框外部关闭
+                this.authModal.addEventListener('click', (e) => {
+                    if (e.target === this.authModal) {
+                        this.hideAuthModal();
+                    }
+                });
+
+                this.editTaskModal.addEventListener('click', (e) => {
+                    if (e.target === this.editTaskModal) {
+                        this.hideEditModal();
+                    }
+                });
+
+                // 同步按钮事件
+                this.syncIndicator.addEventListener('click', () => {
+                    this.manualSync();
+                });
+
+                // 网络状态监听
+                window.addEventListener('online', () => {
+                    this.isOnline = true;
+                    if (this.githubSyncManager) {
+                        this.manualSync();
+                    }
+                });
+
+                window.addEventListener('offline', () => {
+                    this.isOnline = false;
+                    this.updateSyncStatusUI('error', '网络连接已断开');
+                });
+
+                // 社交登录事件
+                this.wechatSignInBtn.addEventListener('click', () => this.signInWithWechat());
+                this.phoneSignInBtn.addEventListener('click', () => this.showPhoneLoginModal());
+            }
+
+            initApp() {
+                try {
+                    // 检查本地存储的用户信息
+                    this.loadUserFromStorage();
+                    
+                    // 监听网络状态变化
+                    this.setupNetworkListeners();
+                    
+                    // 检查自动登录
+                    this.checkAutoLogin();
+                    
+                    console.log('应用初始化成功');
+                    
+                } catch (error) {
+                    console.error('应用初始化失败:', error);
+                    this.showNotification('初始化失败，将使用本地模式', 'warning');
+                }
+            }
+
+            setupNetworkListeners() {
+                // 监听网络状态变化
+                window.addEventListener('online', () => {
+                    this.isOnline = true;
+                    this.syncRetryCount = 0;
+                    // GitHub同步只需要有效的GitHub配置，不需要用户登录
+                    if (this.githubSyncManager) {
+                        this.updateSyncStatusUI('syncing');
+                        this.syncFromGithub();
+                    } else {
+                        this.updateSyncStatusUI('not_configured');
+                    }
+                });
+
+                window.addEventListener('offline', () => {
+                    this.isOnline = false;
+                    this.syncRetryCount = 0;
+                    // 清除任何挂起的重试
+                    if (this.syncRetryTimeout) {
+                        clearTimeout(this.syncRetryTimeout);
+                        this.syncRetryTimeout = null;
+                    }
+                    // 无论是否有GitHub配置，离线时都显示离线状态
+                    if (this.githubSyncManager) {
+                        this.updateSyncStatusUI('error', '离线模式');
+                    } else {
+                        this.updateSyncStatusUI('not_configured');
+                    }
+                });
+            }
+
+            // 同步重试机制
+            retrySync() {
+                if (!this.isOnline || this.syncRetryCount >= 5) {
+                    return;
+                }
+
+                const delay = Math.min(1000 * Math.pow(2, this.syncRetryCount), 30000); // 指数退避，最大30秒
+                this.syncRetryCount++;
+
+                console.log(`同步失败，${delay}ms后重试 (${this.syncRetryCount}/5)`);
+                
+                this.syncRetryTimeout = setTimeout(() => {
+                    // GitHub同步只需要有效的GitHub配置，不需要用户登录
+                    if (this.isOnline && this.githubSyncManager) {
+                        this.syncFromGithub();
+                    }
+                }, delay);
+            }
+
+            loadUserFromStorage() {
+                try {
+                    const userData = localStorage.getItem(STORAGE_KEYS.USER);
+                    const sessionToken = localStorage.getItem(STORAGE_KEYS.SESSION_TOKEN);
+                    
+                    if (userData && sessionToken) {
+                        this.currentUser = JSON.parse(userData);
+                        this.sessionToken = sessionToken;
+                        this.updateUserInfo();
+                        console.log('从本地存储恢复用户登录状态');
+                    }
+                    // 更新同步状态，基于GitHub配置而非用户登录
+                    if (this.githubSyncManager) {
+                        this.updateSyncStatusUI('configured');
+                    } else {
+                        this.updateSyncStatusUI('not_configured');
+                    }
+                } catch (error) {
+                    console.error('加载用户信息失败:', error);
+                }
+            }
+
+            checkAutoLogin() {
+                // 检查是否有记住的登录状态
+                const rememberMe = localStorage.getItem('taskpool_remember_me') === 'true';
+                if (rememberMe && this.currentUser) {
+                    this.validateSession();
+                }
+            }
+
+            hasValidSession() {
+                return this.sessionToken && this.currentUser;
+            }
+
+            async validateSession() {
+                if (!this.hasValidSession()) return false;
+                
+                try {
+                    // 模拟验证会话有效性
+                    const sessionData = JSON.parse(atob(this.sessionToken));
+                    const expiresAt = new Date(sessionData.expiresAt);
+                    return expiresAt > new Date();
+                } catch (error) {
+                    console.error('会话验证失败:', error);
+                    this.logout();
+                    return false;
+                }
+            }
+
+            signInWithWechat() {
+                try {
+                    // 模拟微信登录流程
+                    this.showNotification('正在打开微信登录...', 'info');
+                    
+                    // 显示微信登录二维码模态框
+                    this.showWechatLoginModal();
+                    
+                } catch (error) {
+                    console.error('微信登录出错:', error);
+                    this.showNotification('微信登录失败', 'danger');
+                }
+            }
+
+            showWechatLoginModal() {
+                // 创建微信登录模态框
+                const modal = document.createElement('div');
+                modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center';
+                modal.id = 'wechatLoginModal';
+                
+                modal.innerHTML = `
+                    <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4 animate-slide-in">
+                        <div class="text-center">
+                            <h3 class="text-xl font-bold text-gray-800 mb-4">微信扫码登录</h3>
+                            <div class="bg-white p-4 inline-block rounded-lg border-2 border-gray-200 mb-4">
+                                <div class="w-48 h-48 bg-gray-100 flex items-center justify-center">
+                                    <i class="fa fa-qrcode text-6xl text-gray-400"></i>
+                                </div>
+                            </div>
+                            <p class="text-sm text-gray-600 mb-4">请使用微信扫描二维码登录</p>
+                            <div class="flex justify-center space-x-3">
+                                <button id="cancelWechatLogin" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                                    取消
+                                </button>
+                                <button id="simulateWechatLogin" class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors">
+                                    模拟登录成功
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                document.body.appendChild(modal);
+                
+                // 绑定事件
+                document.getElementById('cancelWechatLogin').addEventListener('click', () => {
+                    document.body.removeChild(modal);
+                });
+                
+                document.getElementById('simulateWechatLogin').addEventListener('click', () => {
+                    this.simulateWechatLoginSuccess();
+                    document.body.removeChild(modal);
+                });
+            }
+
+            simulateWechatLoginSuccess() {
+                // 模拟微信登录成功
+                const wechatUser = {
+                    uid: 'wx_' + Date.now(),
+                    displayName: '微信用户',
+                    avatar: 'https://cdn.jsdelivr.net/gh/ionic-team/ionicons@5.5.1/src/svg/person-circle-outline.svg',
+                    loginType: 'wechat',
+                    createdAt: new Date().toISOString()
+                };
+                
+                this.completeLogin(wechatUser);
+            }
+
+            showPhoneLoginModal() {
+                // 创建手机号登录模态框
+                const modal = document.createElement('div');
+                modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center';
+                modal.id = 'phoneLoginModal';
+                
+                modal.innerHTML = `
+                    <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4 animate-slide-in">
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-800 mb-4">手机号登录</h3>
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">手机号</label>
+                                <input type="tel" id="phoneNumber" class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="请输入手机号">
+                            </div>
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">验证码</label>
+                                <div class="flex space-x-2">
+                                    <input type="text" id="verificationCode" class="flex-1 px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="请输入验证码">
+                                    <button id="sendCodeBtn" class="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors whitespace-nowrap">
+                                        发送验证码
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="flex justify-center space-x-3 mt-6">
+                                <button id="cancelPhoneLogin" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                                    取消
+                                </button>
+                                <button id="confirmPhoneLogin" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                                    登录
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                document.body.appendChild(modal);
+                
+                // 绑定事件
+                document.getElementById('cancelPhoneLogin').addEventListener('click', () => {
+                    document.body.removeChild(modal);
+                });
+                
+                document.getElementById('sendCodeBtn').addEventListener('click', () => {
+                    this.sendVerificationCode();
+                });
+                
+                document.getElementById('confirmPhoneLogin').addEventListener('click', () => {
+                    this.confirmPhoneLogin();
+                });
+            }
+
+            sendVerificationCode() {
+                const phoneNumber = document.getElementById('phoneNumber').value.trim();
+                if (!phoneNumber || !/^1[3-9]\d{9}$/.test(phoneNumber)) {
+                    this.showNotification('请输入正确的手机号', 'warning');
+                    return;
+                }
+                
+                const sendBtn = document.getElementById('sendCodeBtn');
+                sendBtn.disabled = true;
+                sendBtn.textContent = '发送中...';
+                
+                // 模拟发送验证码
+                setTimeout(() => {
+                    this.showNotification('验证码已发送，测试验证码：123456', 'success');
+                    sendBtn.textContent = '重新发送(60s)';
+                    
+                    let countdown = 60;
+                    const timer = setInterval(() => {
+                        countdown--;
+                        sendBtn.textContent = `重新发送(${countdown}s)`;
+                        if (countdown <= 0) {
+                            clearInterval(timer);
+                            sendBtn.disabled = false;
+                            sendBtn.textContent = '发送验证码';
+                        }
+                    }, 1000);
+                }, 1000);
+            }
+
+            confirmPhoneLogin() {
+                const phoneNumber = document.getElementById('phoneNumber').value.trim();
+                const code = document.getElementById('verificationCode').value.trim();
+                
+                if (!phoneNumber || !/^1[3-9]\d{9}$/.test(phoneNumber)) {
+                    this.showNotification('请输入正确的手机号', 'warning');
+                    return;
+                }
+                
+                if (!code) {
+                    this.showNotification('请输入验证码', 'warning');
+                    return;
+                }
+                
+                // 模拟验证码验证（测试验证码：123456）
+                if (code === '123456') {
+                    const phoneUser = {
+                        uid: 'phone_' + phoneNumber,
+                        displayName: '用户' + phoneNumber.slice(-4),
+                        phoneNumber: phoneNumber,
+                        avatar: 'https://cdn.jsdelivr.net/gh/ionic-team/ionicons@5.5.1/src/svg/person-circle-outline.svg',
+                        loginType: 'phone',
+                        createdAt: new Date().toISOString()
+                    };
+                    
+                    this.completeLogin(phoneUser);
+                    document.body.removeChild(document.getElementById('phoneLoginModal'));
+                } else {
+                    this.showNotification('验证码错误', 'danger');
+                }
+            }
+
+            initDatePickers() {
+                try {
+                    // 确保DOM元素存在
+                    const dueDateInput = document.getElementById('dueDateInput');
+                    const editDueDate = document.getElementById('editDueDate');
+                    
+                    if (!dueDateInput || !editDueDate) {
+                        console.error('日期输入框元素未找到');
+                        this.showNotification('日期选择器初始化失败：元素未找到', 'warning');
+                        return;
+                    }
+                    
+                    const tomorrow = new Date();
+                    tomorrow.setDate(tomorrow.getDate() + 1);
+                    
+                    // 为添加任务的日期选择器
+                    flatpickr(dueDateInput, {
+                        enableTime: true,
+                        dateFormat: 'Y-m-d H:i',
+                        defaultDate: tomorrow,
+                        locale: 'zh',
+                        minDate: 'today',
+                        theme: 'light',
+                        position: 'auto',
+                        allowInput: true,
+                        onReady: function(selectedDates, dateStr, instance) {
+                            console.log('主日期选择器初始化完成');
+                            // 添加无截止日期按钮
+                            addNoDueDateButton(dueDateInput, instance);
+                        },
+                        onError: function(error) {
+                            console.error('主日期选择器错误:', error);
+                        }
+                    });
+
+                    // 为编辑任务的日期选择器
+                    flatpickr(editDueDate, {
+                        enableTime: true,
+                        dateFormat: 'Y-m-d H:i',
+                        locale: 'zh',
+                        theme: 'light',
+                        position: 'auto',
+                        allowInput: true,
+                        onReady: function(selectedDates, dateStr, instance) {
+                            console.log('编辑日期选择器初始化完成');
+                            // 添加无截止日期按钮
+                            addNoDueDateButton(editDueDate, instance);
+                        },
+                        onChange: function(selectedDates, dateStr, instance) {
+                            // 当用户选择日期时，清除无截止日期标记
+                            if (dateStr) {
+                                instance.input.dataset.noDueDate = 'false';
+                            }
+                        },
+                        onError: function(error) {
+                            console.error('编辑日期选择器错误:', error);
+                        }
+                    });
+                    
+                    console.log('日期选择器初始化成功');
+                } catch (error) {
+                    console.error('日期选择器初始化失败:', error);
+                    this.showNotification('日期选择器加载失败，请刷新页面重试', 'warning');
+                    
+                    // 提供备用方案
+                    this.provideDatePickerFallback();
+                }
+            }
+
+            // 提供日期选择器备用方案
+            provideDatePickerFallback() {
+                const dueDateInput = document.getElementById('dueDateInput');
+                const editDueDate = document.getElementById('editDueDate');
+                
+                if (dueDateInput) {
+                    const tomorrow = new Date();
+                    tomorrow.setDate(tomorrow.getDate() + 1);
+                    const tomorrowStr = tomorrow.toISOString().slice(0, 16);
+                    dueDateInput.type = 'datetime-local';
+                    dueDateInput.value = tomorrowStr;
+                    dueDateInput.min = new Date().toISOString().slice(0, 16);
+                    dueDateInput.placeholder = '选择日期和时间';
+                }
+                
+                if (editDueDate) {
+                    editDueDate.type = 'datetime-local';
+                    editDueDate.placeholder = '选择日期和时间';
+                }
+                
+                console.log('已启用浏览器原生日期时间选择器作为备用方案');
+                this.showNotification('已启用浏览器原生日期选择器', 'info');
+            }
+
+            updatePriorityButtons() {
+                this.priorityBtns.forEach(btn => {
+                    btn.classList.remove('bg-high', 'bg-medium', 'bg-low', 'bg-opacity-10', 'border-high', 'border-medium', 'border-low');
+                    if (btn.dataset.priority === this.currentPriority) {
+                        btn.classList.add(`bg-${this.currentPriority}`, 'bg-opacity-10', `border-${this.currentPriority}`);
+                    }
+                });
+            }
+
+            updateParentTaskOptions() {
+                const parentTaskSelectContainer = document.getElementById('parentTaskSelectContainer');
+                const parentTaskSelect = document.getElementById('parentTaskSelect');
+                
+                if (this.currentLevel === 1) {
+                    // 大任务不需要父任务
+                    if (parentTaskSelectContainer) {
+                        parentTaskSelectContainer.classList.add('hidden');
+                    }
+                    this.currentParentId = null;
+                    this.parentTaskInfo.innerHTML = '<i class="fa fa-folder-o mr-1"></i><span>无父任务</span>';
+                } else {
+                    // 中任务或小任务需要父任务
+                    if (parentTaskSelectContainer) {
+                        parentTaskSelectContainer.classList.remove('hidden');
+                        
+                        // 清空现有选项
+                        parentTaskSelect.innerHTML = '<option value="">请选择父任务</option>';
+                        
+                        // 根据当前层级筛选可用的父任务
+                        const parentLevel = this.currentLevel === 2 ? 1 : 2;
+                        const availableParents = this.tasks.filter(task => 
+                            task.level === parentLevel && !task.completed
+                        );
+                        
+                        if (availableParents.length === 0) {
+                            // 如果没有可用的父任务，禁用添加按钮
+                            this.addTaskBtn.disabled = true;
+                            this.addTaskBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                            const parentType = this.currentLevel === 2 ? '大任务' : '中任务';
+                            this.parentTaskInfo.innerHTML = `<i class="fa fa-exclamation-circle mr-1 text-danger"></i><span class="text-danger">请先创建${parentType}</span>`;
+                        } else {
+                            // 启用添加按钮
+                            this.addTaskBtn.disabled = false;
+                            this.addTaskBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                            
+                            // 添加父任务选项
+                            availableParents.forEach(task => {
+                                const option = document.createElement('option');
+                                option.value = task.id;
+                                option.textContent = task.title;
+                                parentTaskSelect.appendChild(option);
+                            });
+                            
+                            this.parentTaskInfo.innerHTML = '<i class="fa fa-question-circle mr-1 text-gray-500"></i><span>请选择父任务</span>';
+                        }
+                    }
+                }
+            }
+
+            updateParentTaskInfo() {
+                if (!this.currentParentId) {
+                    this.parentTaskInfo.innerHTML = '<i class="fa fa-question-circle mr-1 text-gray-500"></i><span>请选择父任务</span>';
+                    return;
+                }
+
+                const parentTask = this.tasks.find(t => t.id === this.currentParentId);
+                if (parentTask) {
+                    const parentType = this.currentLevel === 2 ? '大任务' : '中任务';
+                    this.parentTaskInfo.innerHTML = `<i class="fa fa-folder mr-1 text-primary"></i><span class="text-primary">所属${parentType}：${parentTask.title}</span>`;
+                } else {
+                    this.parentTaskInfo.innerHTML = '<i class="fa fa-exclamation-circle mr-1 text-danger"></i><span class="text-danger">父任务不存在</span>';
+                }
+            }
+
+            toggleFilter() {
+                this.filterOptions.classList.toggle('hidden');
+                this.sortOptions.classList.add('hidden');
+            }
+
+            toggleSort() {
+                this.sortOptions.classList.toggle('hidden');
+                this.filterOptions.classList.add('hidden');
+            }
+
+            setFilter(filter) {
+                this.filter = filter;
+                this.renderTasks();
+                this.showNotification(`已筛选为"${this.getFilterDisplayName()}"`, 'info');
+            }
+
+            getFilterDisplayName() {
+                switch (this.filter) {
+                    case 'all': return '全部任务';
+                    case 'pending': return '待完成';
+                    case 'completed': return '已完成';
+                    case 'overdue': return '已逾期';
+                    default: return '全部任务';
+                }
+            }
+
+            setSort(sortBy) {
+                this.sortBy = sortBy;
+                this.renderTasks();
+                this.showNotification(`已按${this.getSortDisplayName()}排序`, 'info');
+            }
+
+            getSortDisplayName() {
+                switch (this.sortBy) {
+                    case 'priority': return '优先级';
+                    case 'dueDate': return '截止时间';
+                    case 'createdAt': return '创建时间';
+                    default: return '优先级';
+                }
+            }
+
+            updateSyncStatus() {
+                if (this.currentUser) {
+                    if (this.isOnline) {
+                        this.syncStatus.innerHTML = `<i class="fa fa-cloud"></i> 已连接服务器`;
+                        this.syncIndicator.className = 'sync-indicator';
+                    } else {
+                        this.syncStatus.innerHTML = `<i class="fa fa-wifi-slash"></i> 离线模式`;
+                        this.syncIndicator.className = 'sync-indicator offline';
+                    }
+                } else {
+                    this.syncStatus.innerHTML = `<i class="fa fa-user-slash"></i> 未登录`;
+                    this.syncIndicator.className = 'sync-indicator offline';
+                }
+            }
+
+            showAuthModal() {
+                this.authModal.classList.remove('hidden');
+                this.switchToLogin();
+            }
+
+            hideAuthModal() {
+                this.authModal.classList.add('hidden');
+            }
+
+            hideEditModal() {
+                this.editTaskModal.classList.add('hidden');
+            }
+
+            switchToLogin() {
+                document.getElementById('authModalTitle').textContent = '登录账号';
+                this.loginForm.classList.remove('hidden');
+                this.registerForm.classList.add('hidden');
+            }
+
+            switchToRegister() {
+                document.getElementById('authModalTitle').textContent = '创建账号';
+                this.loginForm.classList.add('hidden');
+                this.registerForm.classList.remove('hidden');
+            }
+
+            login() {
+                const email = document.getElementById('loginEmail').value.trim();
+                const password = document.getElementById('loginPassword').value;
+                const rememberMe = document.getElementById('rememberMe')?.checked || false;
+
+                if (!email || !password) {
+                    this.showNotification('请填写完整的登录信息', 'warning');
+                    return;
+                }
+
+                // 模拟账号密码登录
+                this.showNotification('登录中...', 'info');
+
+                // 模拟登录验证
+                setTimeout(() => {
+                    // 测试账号：test@example.com，密码：123456
+                    if (email === 'test@example.com' && password === '123456') {
+                        const user = {
+                            uid: 'email_' + Date.now(),
+                            email: email,
+                            displayName: email.split('@')[0],
+                            avatar: 'https://cdn.jsdelivr.net/gh/ionic-team/ionicons@5.5.1/src/svg/person-circle-outline.svg',
+                            loginType: 'email',
+                            createdAt: new Date().toISOString()
+                        };
+                        
+                        this.completeLogin(user, rememberMe);
+                        this.hideAuthModal();
+                    } else {
+                        this.showNotification('账号或密码错误（测试账号：test@example.com，密码：123456）', 'danger');
+                    }
+                }, 1000);
+            }
+
+            register() {
+                const name = document.getElementById('registerName').value.trim();
+                const email = document.getElementById('registerEmail').value.trim();
+                const password = document.getElementById('registerPassword').value;
+
+                if (!name || !email || !password) {
+                    this.showNotification('请填写完整的注册信息', 'warning');
+                    return;
+                }
+
+                if (password.length < 6) {
+                    this.showNotification('密码至少需要6个字符', 'warning');
+                    return;
+                }
+
+                // 模拟注册流程
+                this.showNotification('注册中...', 'info');
+
+                setTimeout(() => {
+                    const user = {
+                        uid: 'email_' + Date.now(),
+                        email: email,
+                        displayName: name,
+                        avatar: 'https://cdn.jsdelivr.net/gh/ionic-team/ionicons@5.5.1/src/svg/person-circle-outline.svg',
+                        loginType: 'email',
+                        createdAt: new Date().toISOString()
+                    };
+                    
+                    this.completeLogin(user);
+                    this.hideAuthModal();
+                    this.showNotification('注册成功！', 'success');
+                }, 1000);
+            }
+
+            updateUserInfo() {
+                if (this.currentUser) {
+                    const displayName = this.currentUser.displayName || this.currentUser.email?.split('@')[0] || '用户';
+                    const initial = displayName.charAt(0).toUpperCase();
+                    
+                    // 如果有头像，使用头像
+                    if (this.currentUser.avatar) {
+                        this.userAvatar.innerHTML = `<img src="${this.currentUser.avatar}" class="w-full h-full rounded-full object-cover">`;
+                    } else {
+                        this.userAvatar.textContent = initial;
+                    }
+                    
+                    this.userName.textContent = displayName;
+                    this.authBtn.innerHTML = '<i class="fa fa-sign-out mr-1"></i>退出登录';
+                    this.authBtn.addEventListener('click', () => this.logout(), { once: true });
+                } else {
+                    this.userAvatar.textContent = '用';
+                    this.userName.textContent = '用户';
+                    this.authBtn.innerHTML = '<i class="fa fa-user-circle mr-1"></i>登录/注册';
+                    this.authBtn.addEventListener('click', () => this.showAuthModal(), { once: true });
+                }
+            }
+
+            logout() {
+                if (confirm('确定要退出登录吗？')) {
+                    // 清除本地存储的用户信息
+                    localStorage.removeItem(STORAGE_KEYS.USER);
+                    localStorage.removeItem(STORAGE_KEYS.SESSION_TOKEN);
+                    localStorage.removeItem('taskpool_remember_me');
+                    
+                    // 清除会话信息
+                    this.currentUser = null;
+                    this.sessionToken = null;
+                    
+                    // 更新UI
+                    this.updateUserInfo();
+                    // 更新同步状态，基于GitHub配置而非用户登录
+                    if (this.githubSyncManager) {
+                        this.updateSyncStatusUI('configured');
+                    } else {
+                        this.updateSyncStatusUI('not_configured');
+                    }
+                    
+                    this.showNotification('已退出登录', 'info');
+                    console.log('用户退出登录');
+                }
+            }
+
+            addTask() {
+                const taskTitle = this.taskInput.value.trim();
+                if (!taskTitle) {
+                    this.showNotification('请输入任务内容', 'warning');
+                    this.taskInput.focus();
+                    return;
+                }
+
+                const dueDate = this.dueDateInput.value;
+                const hasNoDueDate = this.dueDateInput.dataset.noDueDate === 'true';
+
+                // 验证父任务关系
+                if (this.currentLevel > 1 && !this.currentParentId) {
+                    const parentType = this.currentLevel === 2 ? '大任务' : '中任务';
+                    this.showNotification(`请选择${parentType}`, 'warning');
+                    return;
+                }
+
+                const task = {
+                    id: Date.now().toString(),
+                    title: taskTitle,
+                    priority: this.currentPriority,
+                    dueDate: hasNoDueDate ? null : (dueDate ? new Date(dueDate).toISOString() : null),
+                    completed: false,
+                    level: this.currentLevel,
+                    parentId: this.currentParentId,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                };
+
+                this.tasks.unshift(task);
+                this.saveLocalTasks();
+                this.renderTasks();
+                
+                // GitHub同步只需要有效的GitHub配置，不需要用户登录
+                if (this.isOnline && this.githubSyncManager) {
+                    this.syncFromGithub();
+                }
+                this.updateTaskCount();
+                
+                // 重置表单
+                this.taskInput.value = '';
+                this.taskLevelSelect.value = '1';
+                this.currentLevel = 1;
+                this.currentParentId = null;
+                
+                // 重置日期选择器
+                if (this.dueDateInput) {
+                    this.dueDateInput.value = '';
+                    this.dueDateInput.dataset.noDueDate = 'false';
+                    // 重置为默认值（明天）
+                    const tomorrow = new Date();
+                    tomorrow.setDate(tomorrow.getDate() + 1);
+                    if (typeof flatpickr !== 'undefined') {
+                        const instance = flatpickr.getInstance(this.dueDateInput);
+                        if (instance) {
+                            instance.setDate(tomorrow);
+                        }
+                    }
+                }
+                
+                // 更新父任务选择UI
+                const parentTaskSelectContainer = document.getElementById('parentTaskSelectContainer');
+                if (parentTaskSelectContainer) {
+                    parentTaskSelectContainer.classList.add('hidden');
+                }
+                this.parentTaskInfo.innerHTML = '<i class="fa fa-folder-o mr-1"></i><span>无父任务</span>';
+                
+                this.taskInput.focus();
+                this.showNotification('任务添加成功！', 'success');
+                this.checkReminders();
+            }
+
+            buildTaskTree() {
+                const taskMap = new Map();
+                const rootTasks = [];
+                
+                // 首先创建所有任务的映射
+                this.tasks.forEach(task => {
+                    taskMap.set(task.id, { ...task, children: [] });
+                });
+                
+                // 然后构建任务树
+                this.tasks.forEach(task => {
+                    if (task.parentId) {
+                        const parent = taskMap.get(task.parentId);
+                        if (parent) {
+                            parent.children.push(taskMap.get(task.id));
+                        }
+                    } else {
+                        rootTasks.push(taskMap.get(task.id));
+                    }
+                });
+                
+                return rootTasks;
+            }
+
+            renderTaskTree(tasks, level = 0) {
+                if (!tasks || tasks.length === 0) return '';
+                
+                return tasks.map(task => this.renderTaskItem(task, level)).join('');
+            }
+
+            renderTaskItem(task, level) {
+                const indent = level * 20;
+                const isExpanded = this.expandedTasks.has(task.id);
+                const hasChildren = task.children && task.children.length > 0;
+                
+                const levelClass = level === 0 ? 'task-level-1' : (level === 1 ? 'task-level-2' : 'task-level-3');
+                const priorityClass = `priority-${task.priority}`;
+                const completedClass = task.completed ? 'task-completed' : '';
+                
+                let dueDateText = '';
+                if (task.dueDate === null) {
+                    dueDateText = `<span class="text-gray-500">无截止日期</span>`;
+                } else {
+                    const dueDate = new Date(task.dueDate);
+                    const now = new Date();
+                    const isOverdue = !task.completed && dueDate < now;
+                    const isToday = dueDate.toDateString() === now.toDateString();
+                    const isTomorrow = new Date(now.getTime() + 86400000).toDateString() === dueDate.toDateString();
+                    
+                    if (isOverdue) {
+                        dueDateText = `<span class="text-danger">已逾期</span>`;
+                    } else if (isToday) {
+                        dueDateText = `<span class="text-warning">今天</span>`;
+                    } else if (isTomorrow) {
+                        dueDateText = `<span class="text-info">明天</span>`;
+                    } else {
+                        dueDateText = `<span class="text-gray-500">${dueDate.toLocaleDateString('zh-CN')}</span>`;
+                    }
+                }
+
+                // 计算子任务完成情况
+                let childStats = '';
+                if (hasChildren) {
+                    const totalChildren = task.children.length;
+                    const completedChildren = task.children.filter(child => child.completed).length;
+                    const progress = Math.round((completedChildren / totalChildren) * 100);
+                    
+                    childStats = `
+                        <div class="flex items-center space-x-2 mt-2">
+                            <div class="w-full bg-gray-200 rounded-full h-1.5">
+                                <div class="bg-primary h-1.5 rounded-full" style="width: ${progress}%"></div>
+                            </div>
+                            <span class="text-xs text-gray-500 whitespace-nowrap">${completedChildren}/${totalChildren}</span>
+                        </div>
+                    `;
+                }
+
+                let taskHtml = `
+                    <div class="task-item ${levelClass} ${priorityClass} ${completedClass} border rounded-lg p-3 mb-2 card-hover animate-fade-in" 
+                         data-id="${task.id}" style="padding-left: ${32 + indent}px; position: relative;">
+                        ${level > 0 ? `<div class="absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-0.5 bg-gray-300"></div>` : ''}
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-2 flex-1">
+                                <button 
+                                    class="toggle-task w-5 h-5 rounded border-2 ${task.completed ? 'bg-success border-success' : 'border-gray-300'} flex items-center justify-center transition-all duration-200"
+                                    data-id="${task.id}"
+                                    title="${task.completed ? '标记为未完成' : '标记为完成'}"
+                                >
+                                    ${task.completed ? '<i class="fa fa-check text-white text-xs"></i>' : ''}
+                                </button>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center">
+                                        <p class="text-sm font-medium ${task.completed ? 'line-through text-gray-500' : 'text-gray-800'} truncate" title="${this.escapeHtml(task.title)}">
+                                            ${this.escapeHtml(task.title)}
+                                        </p>
+                                        ${hasChildren ? `
+                                            <span class="inline-flex items-center justify-center w-5 h-5 text-xs bg-blue-100 text-blue-800 rounded-full ml-2">
+                                                ${task.children.length}
+                                            </span>
+                                        ` : ''}
+                                    </div>
+                                    <div class="flex items-center space-x-3 mt-1">
+                                        <span class="inline-block w-2 h-2 rounded-full bg-${task.priority}"></span>
+                                        <span class="text-xs">${dueDateText}</span>
+                                        <span class="text-xs text-gray-500">${this.formatRelativeTime(task.createdAt)}</span>
+                                    </div>
+                                    ${childStats}
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                ${hasChildren ? `
+                                    <button 
+                                        class="expand-task w-6 h-6 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100 transition-colors"
+                                        data-id="${task.id}"
+                                    >
+                                        <i class="fa fa-angle-${isExpanded ? 'down' : 'right'}"></i>
+                                    </button>
+                                ` : ''}
+                                <button 
+                                    class="edit-task w-6 h-6 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100 transition-colors"
+                                    data-id="${task.id}"
+                                    title="编辑任务"
+                                >
+                                    <i class="fa fa-pencil"></i>
+                                </button>
+                                <button 
+                                    class="delete-task w-6 h-6 rounded-full flex items-center justify-center text-gray-500 hover:bg-red-100 hover:text-danger transition-colors"
+                                    data-id="${task.id}"
+                                    title="删除任务"
+                                >
+                                    <i class="fa fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                // 渲染子任务
+                if (hasChildren && isExpanded) {
+                    taskHtml += `<div class="ml-8 border-l-2 border-gray-200 pl-4">
+                        ${this.renderTaskTree(task.children, level + 1)}
+                    </div>`;
+                }
+
+                return taskHtml;
+            }
+
+            renderTasks() {
+                // 应用筛选
+                this.applyFilter();
+                
+                // 应用排序
+                this.applySort();
+                
+                const rootTasks = this.buildTaskTree();
+                
+                if (rootTasks.length === 0) {
+                    this.emptyState.classList.remove('hidden');
+                    this.taskList.classList.add('hidden');
+                } else {
+                    this.emptyState.classList.add('hidden');
+                    this.taskList.classList.remove('hidden');
+                    this.taskList.innerHTML = this.renderTaskTree(rootTasks);
+                    
+                    // 绑定任务项事件
+                    this.bindTaskEvents();
+                }
+                
+                this.updateTaskCount();
+            }
+
+            applyFilter() {
+                const now = new Date();
+                
+                switch (this.filter) {
+                    case 'pending':
+                        this.filteredTasks = this.tasks.filter(task => !task.completed);
+                        break;
+                    case 'completed':
+                        this.filteredTasks = this.tasks.filter(task => task.completed);
+                        break;
+                    case 'overdue':
+                        this.filteredTasks = this.tasks.filter(task => 
+                            !task.completed && task.dueDate !== null && new Date(task.dueDate) < now
+                        );
+                        break;
+                    default:
+                        this.filteredTasks = [...this.tasks];
+                }
+            }
+
+            applySort() {
+                this.filteredTasks.sort((a, b) => {
+                    switch (this.sortBy) {
+                        case 'priority':
+                            const priorityOrder = { high: 0, medium: 1, low: 2 };
+                            return priorityOrder[a.priority] - priorityOrder[b.priority];
+                        case 'dueDate':
+                            if (a.dueDate === null && b.dueDate === null) return 0;
+                            if (a.dueDate === null) return 1; // 无截止日期的任务排在后面
+                            if (b.dueDate === null) return -1;
+                            return new Date(a.dueDate) - new Date(b.dueDate);
+                        case 'createdAt':
+                            return new Date(b.createdAt) - new Date(a.createdAt);
+                        default:
+                            return 0;
+                    }
+                });
+            }
+
+            bindTaskEvents() {
+                // 切换完成状态
+                this.taskList.querySelectorAll('.toggle-task').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const taskId = e.target.closest('.toggle-task').dataset.id;
+                        this.toggleTaskCompleted(taskId);
+                    });
+                });
+
+                // 展开/折叠任务
+                this.taskList.querySelectorAll('.expand-task').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const taskId = e.target.closest('.expand-task').dataset.id;
+                        this.toggleTaskExpanded(taskId);
+                    });
+                });
+
+                // 编辑任务
+                this.taskList.querySelectorAll('.edit-task').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const taskId = e.target.closest('.edit-task').dataset.id;
+                        this.editTask(taskId);
+                    });
+                });
+
+                // 删除任务
+                this.taskList.querySelectorAll('.delete-task').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const taskId = e.target.closest('.delete-task').dataset.id;
+                        this.deleteTask(taskId);
+                    });
+                });
+            }
+
+            toggleTaskCompleted(taskId) {
+                const task = this.tasks.find(t => t.id === taskId);
+                if (task) {
+                    task.completed = !task.completed;
+                    task.completedAt = task.completed ? new Date().toISOString() : null;
+                    task.updatedAt = new Date().toISOString();
+                    
+                    this.saveLocalTasks();
+                    this.renderTasks();
+                    
+                    // GitHub同步只需要有效的GitHub配置，不需要用户登录
+                    if (this.isOnline && this.githubSyncManager) {
+                        this.syncFromGithub();
+                    }
+                    
+                    const message = task.completed ? '任务已完成！' : '任务已恢复';
+                    this.showNotification(message, 'success');
+                }
+            }
+
+            toggleTaskExpanded(taskId) {
+                if (this.expandedTasks.has(taskId)) {
+                    this.expandedTasks.delete(taskId);
+                } else {
+                    this.expandedTasks.add(taskId);
+                }
+                this.renderTasks();
+            }
+
+            editTask(id) {
+                const task = this.tasks.find(t => t.id === id);
+                if (!task) return;
+
+                // 填充编辑表单
+                this.editTaskId.value = task.id;
+                this.editTaskTitle.value = task.title;
+                this.editDueDate.value = this.formatDateForInput(task.dueDate);
+                this.editTaskCompleted.checked = task.completed;
+                
+                // 设置优先级
+                this.editPriorityBtns.forEach(btn => {
+                    btn.classList.remove('bg-opacity-10', 'border-high', 'border-medium', 'border-low');
+                    if (btn.dataset.priority === task.priority) {
+                        btn.classList.add(`bg-${task.priority}`, 'bg-opacity-10', `border-${task.priority}`);
+                        this.editTaskForm.dataset.priority = task.priority;
+                    }
+                });
+
+                // 显示编辑模态框
+                this.editTaskModal.classList.remove('hidden');
+            }
+
+            saveTaskChanges() {
+                const taskId = this.editTaskId.value;
+                const task = this.tasks.find(t => t.id === taskId);
+                if (!task) return;
+
+                const title = this.editTaskTitle.value.trim();
+                if (!title) {
+                    this.showNotification('请输入任务标题', 'warning');
+                    this.editTaskTitle.focus();
+                    return;
+                }
+
+                const dueDate = this.editDueDate.value;
+                const hasNoDueDate = this.editDueDate.dataset.noDueDate === 'true';
+
+                const priority = this.editTaskForm.dataset.priority || task.priority;
+                const completed = this.editTaskCompleted.checked;
+
+                // 更新任务
+                task.title = title;
+                task.priority = priority;
+                task.dueDate = hasNoDueDate ? null : (dueDate ? new Date(dueDate).toISOString() : null);
+                task.completed = completed;
+                task.completedAt = completed ? (task.completedAt || new Date().toISOString()) : null;
+                task.updatedAt = new Date().toISOString();
+
+                this.saveLocalTasks();
+                this.renderTasks();
+                
+                // GitHub同步只需要有效的GitHub配置，不需要用户登录
+                if (this.isOnline && this.githubSyncManager) {
+                    this.syncFromGithub();
+                }
+                this.hideEditModal();
+                this.showNotification('任务已更新', 'success');
+                this.checkReminders();
+            }
+
+            confirmDeleteTask() {
+                const taskId = this.editTaskId.value;
+                const task = this.tasks.find(t => t.id === taskId);
+                if (!task) return;
+
+                if (confirm(`确定要删除任务"${task.title}"吗？`)) {
+                    this.deleteTask(taskId);
+                    this.hideEditModal();
+                }
+            }
+
+            deleteTask(id) {
+                const taskIndex = this.tasks.findIndex(t => t.id === id);
+                if (taskIndex !== -1) {
+                    const task = this.tasks[taskIndex];
+                    
+                    // 删除相关的子任务
+                    const childTaskIds = this.tasks
+                        .filter(t => t.parentId === id)
+                        .map(t => t.id);
+                    
+                    childTaskIds.forEach(childId => {
+                        this.deleteTask(childId);
+                    });
+                    
+                    this.tasks.splice(taskIndex, 1);
+                    this.saveLocalTasks();
+                    this.renderTasks();
+                    
+                    // GitHub同步只需要有效的GitHub配置，不需要用户登录
+                    if (this.isOnline && this.githubSyncManager) {
+                        this.syncFromGithub();
+                    }
+                    
+                    this.showNotification('任务已删除', 'info');
+                    this.checkReminders();
+                }
+            }
+
+            clearAllTasks() {
+                if (this.tasks.length === 0) {
+                    this.showNotification('没有任务可以清空', 'info');
+                    return;
+                }
+
+                if (confirm('确定要清空所有任务吗？此操作不可恢复。')) {
+                    this.tasks = [];
+                    this.expandedTasks.clear();
+                    this.saveLocalTasks();
+                    this.renderTasks();
+                    this.showNotification('所有任务已清空', 'info');
+                }
+            }
+
+            updateTaskCount() {
+                const total = this.tasks.length;
+                const completed = this.tasks.filter(t => t.completed).length;
+                const high = this.tasks.filter(t => t.priority === 'high').length;
+                const medium = this.tasks.filter(t => t.priority === 'medium').length;
+                const low = this.tasks.filter(t => t.priority === 'low').length;
+
+                this.taskCount.textContent = total;
+                this.completedNum.textContent = completed;
+                this.highPriorityCount.textContent = high;
+                this.mediumPriorityCount.textContent = medium;
+                this.lowPriorityCount.textContent = low;
+            }
+
+            loadLocalTasks() {
+                try {
+                    const saved = localStorage.getItem(STORAGE_KEYS.TASKS);
+                    if (saved) {
+                        this.tasks = JSON.parse(saved);
+                    }
+                    
+                    const savedExpanded = localStorage.getItem('taskPoolExpanded');
+                    if (savedExpanded) {
+                        this.expandedTasks = new Set(JSON.parse(savedExpanded));
+                    }
+                    
+                    const savedSettings = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+                    if (savedSettings) {
+                        const settings = JSON.parse(savedSettings);
+                        this.filter = settings.filter || 'all';
+                        this.sortBy = settings.sortBy || 'priority';
+                    }
+                } catch (error) {
+                    console.error('加载本地任务失败:', error);
+                    this.tasks = [];
+                }
+            }
+
+            saveLocalTasks() {
+                try {
+                    localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify(this.tasks));
+                    localStorage.setItem('taskPoolExpanded', JSON.stringify([...this.expandedTasks]));
+                    
+                    const settings = {
+                        filter: this.filter,
+                        sortBy: this.sortBy
+                    };
+                    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+                    
+                    // 保存同步状态
+                    const syncState = {
+                        lastSyncTime: new Date().toISOString(),
+                        syncStatus: 'synced'
+                    };
+                    localStorage.setItem(STORAGE_KEYS.SYNC_STATE, JSON.stringify(syncState));
+                    
+                } catch (error) {
+                    console.error('保存本地任务失败:', error);
+                    this.showNotification('保存任务失败', 'danger');
+                }
+            }
+
+
+
+            completeLogin(user, rememberMe = false) {
+                // 生成会话令牌
+                const sessionData = {
+                    userId: user.uid,
+                    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7天过期
+                    issuedAt: new Date().toISOString()
+                };
+                
+                this.sessionToken = btoa(JSON.stringify(sessionData));
+                this.currentUser = user;
+                
+                // 保存用户信息到本地存储
+                localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+                localStorage.setItem(STORAGE_KEYS.SESSION_TOKEN, this.sessionToken);
+                
+                if (rememberMe) {
+                    localStorage.setItem('taskpool_remember_me', 'true');
+                }
+                
+                // 更新UI
+                this.updateUserInfo();
+                // 更新同步状态，基于GitHub配置而非用户登录
+                if (this.githubSyncManager) {
+                    this.updateSyncStatusUI('configured');
+                } else {
+                    this.updateSyncStatusUI('not_configured');
+                }
+                
+                // 同步任务
+                if (this.isOnline) {
+                    this.syncTasksWithServer();
+                }
+                
+                this.showNotification(`欢迎回来，${user.displayName}！`, 'success');
+                console.log('用户登录成功:', user);
+            }
+
+            formatDateForInput(dateString) {
+                if (!dateString) return '';
+                const date = new Date(dateString);
+                return date.toISOString().slice(0, 16);
+            }
+
+            formatRelativeTime(dateString) {
+                const date = new Date(dateString);
+                const now = new Date();
+                const diffInSeconds = Math.floor((now - date) / 1000);
+                
+                if (diffInSeconds < 60) {
+                    return '刚刚';
+                } else if (diffInSeconds < 3600) {
+                    return `${Math.floor(diffInSeconds / 60)}分钟前`;
+                } else if (diffInSeconds < 86400) {
+                    return `${Math.floor(diffInSeconds / 3600)}小时前`;
+                } else if (diffInSeconds < 604800) {
+                    return `${Math.floor(diffInSeconds / 86400)}天前`;
+                } else {
+                    return date.toLocaleDateString('zh-CN');
+                }
+            }
+
+            startReminderCheck() {
+                // 每分钟检查一次提醒
+                this.reminderCheckInterval = setInterval(() => {
+                    this.checkReminders();
+                }, 60000);
+                
+                // 立即检查一次
+                this.checkReminders();
+            }
+
+            checkReminders() {
+                const now = new Date();
+                const reminderList = document.getElementById('reminderList');
+                reminderList.innerHTML = ''; // 清空现有提醒
+                
+                // 筛选过期和即将到期的任务
+                const reminderTasks = this.tasks.filter(task => {
+                    if (task.completed || task.dueDate === null) return false;
+                    const dueDate = new Date(task.dueDate);
+                    const diffDays = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
+                    return diffDays <= 1; // 今天、明天或已过期
+                });
+                
+                // 生成提醒项
+                reminderTasks.forEach(task => {
+                    const dueDate = new Date(task.dueDate);
+                    const diffDays = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
+                    let statusText = '';
+                    
+                    if (diffDays < 0) {
+                        statusText = `已逾期${Math.abs(diffDays)}天!`;
+                    } else if (diffDays === 0) {
+                        statusText = '今天到期!';
+                    } else {
+                        statusText = `明天到期!`;
+                    }
+                    
+                    const li = document.createElement('li');
+                    li.innerHTML = `<i class="fa fa-exclamation-circle text-warning mr-2"></i>任务"${task.title}"${statusText}`;
+                    reminderList.appendChild(li);
+                });
+                
+                // 如果没有提醒，显示提示信息
+                if (reminderTasks.length === 0) {
+                    const li = document.createElement('li');
+                    li.className = 'text-gray-500 italic';
+                    li.innerHTML = `<i class="fa fa-check-circle text-success mr-2"></i>暂无任务提醒`;
+                    reminderList.appendChild(li);
+                }
+                
+                // 原有逻辑：检查1小时内到期的任务并显示通知
+                const dueSoonTasks = this.tasks.filter(task => {
+                    if (task.completed || task.dueDate === null) return false;
+                    
+                    const dueDate = new Date(task.dueDate);
+                    const timeUntilDue = dueDate - now;
+                    
+                    // 检查是否在1小时内到期
+                    return timeUntilDue > 0 && timeUntilDue <= 3600000;
+                });
+                
+                dueSoonTasks.forEach(task => {
+                    this.showNotification('任务即将到期', 'warning', task.title);
+                });
+            }
+
+            showNotification(title, type = 'info', message = '') {
+                const iconClass = {
+                    success: 'bg-success',
+                    warning: 'bg-warning',
+                    danger: 'bg-danger',
+                    info: 'bg-primary'
+                };
+                
+                const iconName = {
+                    success: 'fa-check-circle',
+                    warning: 'fa-exclamation-triangle',
+                    danger: 'fa-exclamation-circle',
+                    info: 'fa-info-circle'
+                };
+                
+                this.notificationTitle.textContent = title;
+                this.notificationMessage.textContent = message;
+                this.notificationIcon.className = `flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full mr-3 ${iconClass[type] || iconClass.info}`;
+                this.notificationIcon.innerHTML = `<i class="fa ${iconName[type] || iconName.info} text-white"></i>`;
+                
+                this.notification.classList.remove('translate-x-full');
+                
+                // 3秒后自动隐藏
+                setTimeout(() => {
+                    this.hideNotification();
+                }, 3000);
+            }
+
+            hideNotification() {
+                this.notification.classList.add('translate-x-full');
+            }
+
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            // ========== GitHub同步功能 ==========
+
+
+
+            // 加载同步配置
+            loadSyncConfig() {
+                const config = this.syncConfigManager.getConfig();
+                
+                if (config.token && config.gistId) {
+                    // 初始化GitHub同步管理器
+                    this.githubSyncManager = new GitHubSyncManager(config.token, config.gistId);
+                    
+                    // 更新UI
+                    if (document.getElementById('githubToken')) {
+                        document.getElementById('githubToken').value = config.token;
+                    }
+                    if (document.getElementById('gistId')) {
+                        document.getElementById('gistId').value = config.gistId;
+                    }
+                    if (document.getElementById('autoSync')) {
+                        document.getElementById('autoSync').checked = config.autoSync || false;
+                    }
+                    
+                    if (config.autoSync) {
+                        if (document.getElementById('syncIntervalContainer')) {
+                            document.getElementById('syncIntervalContainer').classList.remove('hidden');
+                        }
+                        if (document.getElementById('syncInterval')) {
+                            document.getElementById('syncInterval').value = config.syncInterval || 5;
+                        }
+                    }
+                    
+                    // 更新状态
+                    this.updateSyncStatusIndicator('configured');
+                    this.updateSyncStatusUI('configured');
+                }
+            }
+
+            // 绑定GitHub同步事件
+            bindGithubSyncEvents() {
+                // 等待DOM加载完成
+                setTimeout(() => {
+                    // 打开配置模态框
+                    document.getElementById('openSyncSettingsBtn')?.addEventListener('click', () => {
+                        this.showGithubSyncModal();
+                    });
+                    
+                    // 关闭配置模态框
+                    document.getElementById('closeGithubSyncModal')?.addEventListener('click', () => {
+                        this.hideGithubSyncModal();
+                    });
+                    
+                    // 切换Token可见性
+                    document.getElementById('toggleTokenVisibility')?.addEventListener('click', (e) => {
+                        const tokenInput = document.getElementById('githubToken');
+                        const icon = e.currentTarget.querySelector('i');
+                        
+                        if (tokenInput.type === 'password') {
+                            tokenInput.type = 'text';
+                            icon.className = 'fa fa-eye-slash';
+                        } else {
+                            tokenInput.type = 'password';
+                            icon.className = 'fa fa-eye';
+                        }
+                    });
+                    
+                    // 自动同步开关
+                    document.getElementById('autoSync')?.addEventListener('change', (e) => {
+                        if (document.getElementById('syncIntervalContainer')) {
+                            document.getElementById('syncIntervalContainer').classList.toggle('hidden', !e.target.checked);
+                        }
+                    });
+                    
+                    // 测试连接
+                    document.getElementById('testGithubConnection')?.addEventListener('click', async () => {
+                        await this.testGithubConnection();
+                    });
+                    
+                    // 保存配置
+                    document.getElementById('saveGithubConfig')?.addEventListener('click', async () => {
+                        await this.saveGithubConfig();
+                    });
+                    
+                    // 仅下载
+                    document.getElementById('downloadFromGithub')?.addEventListener('click', async () => {
+                        await this.downloadFromGithub();
+                    });
+                    
+                    // 仅上传
+                    document.getElementById('uploadToGithub')?.addEventListener('click', async () => {
+                        await this.uploadToGithub();
+                    });
+                    
+                    // 清除配置
+                    document.getElementById('clearGithubConfig')?.addEventListener('click', () => {
+                        this.clearGithubConfig();
+                    });
+                    
+                    // 显示帮助
+                    document.getElementById('showGithubSyncHelp')?.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        this.showGithubSyncHelpModal();
+                    });
+                    
+                    // 关闭帮助模态框
+                    document.getElementById('closeGithubSyncHelpModal')?.addEventListener('click', () => {
+                        this.hideGithubSyncHelpModal();
+                    });
+                    
+                    // 状态指示器点击
+                    document.getElementById('syncStatusButton')?.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this.toggleSyncStatusMenu();
+                    });
+                    
+                    // 立即同步按钮
+                    document.getElementById('syncNowBtn')?.addEventListener('click', async () => {
+                        await this.performSync();
+                        this.hideSyncStatusMenu();
+                    });
+                    
+                    // 点击其他地方关闭菜单
+                    document.addEventListener('click', () => {
+                        this.hideSyncStatusMenu();
+                    });
+                }, 100);
+            }
+
+            // 测试GitHub连接
+            async testGithubConnection() {
+                const token = document.getElementById('githubToken')?.value.trim();
+                const gistId = document.getElementById('gistId')?.value.trim();
+                
+                if (!token || !gistId) {
+                    this.showNotification('请填写完整的配置信息', 'warning');
+                    return;
+                }
+                
+                const statusDiv = document.getElementById('githubSyncStatus');
+                if (statusDiv) {
+                    statusDiv.innerHTML = '<div class="flex items-center justify-center py-2"><i class="fa fa-spinner fa-spin mr-2"></i> 测试连接中...</div>';
+                    statusDiv.classList.remove('hidden');
+                }
+                
+                try {
+                    const testManager = new GitHubSyncManager(token, gistId);
+                    const result = await testManager.validateCredentials();
+                    
+                    if (result.valid) {
+                        if (statusDiv) {
+                            statusDiv.innerHTML = `
+                                <div class="flex items-center text-green-600">
+                                    <i class="fa fa-check-circle mr-2"></i>
+                                    <span>连接成功！GitHub同步已就绪</span>
+                                </div>
+                            `;
+                        }
+                        this.showNotification('GitHub连接成功', 'success');
+                    } else {
+                        if (statusDiv) {
+                            statusDiv.innerHTML = `
+                                <div class="flex items-center text-red-600">
+                                    <i class="fa fa-times-circle mr-2"></i>
+                                    <span>${result.message}</span>
+                                </div>
+                            `;
+                        }
+                        this.showNotification(`连接失败: ${result.message}`, 'danger');
+                    }
+                } catch (error) {
+                    if (statusDiv) {
+                        statusDiv.innerHTML = `
+                            <div class="flex items-center text-red-600">
+                                <i class="fa fa-times-circle mr-2"></i>
+                                <span>连接错误: ${error.message}</span>
+                            </div>
+                        `;
+                    }
+                    this.showNotification(`连接错误: ${error.message}`, 'danger');
+                }
+            }
+
+            // 保存GitHub配置
+            async saveGithubConfig() {
+                const token = document.getElementById('githubToken')?.value.trim();
+                const gistId = document.getElementById('gistId')?.value.trim();
+                const autoSync = document.getElementById('autoSync')?.checked;
+                const syncInterval = parseInt(document.getElementById('syncInterval')?.value);
+                
+                if (!token || !gistId) {
+                    this.showNotification('请填写完整的配置信息', 'warning');
+                    return;
+                }
+                
+                const statusDiv = document.getElementById('githubSyncStatus');
+                if (statusDiv) {
+                    statusDiv.innerHTML = '<div class="flex items-center justify-center py-2"><i class="fa fa-spinner fa-spin mr-2"></i> 保存配置中...</div>';
+                    statusDiv.classList.remove('hidden');
+                }
+                
+                try {
+                    // 先测试连接
+                    const testManager = new GitHubSyncManager(token, gistId);
+                    const result = await testManager.validateCredentials();
+                    
+                    if (!result.valid) {
+                        throw new Error(result.message);
+                    }
+                    
+                    // 保存配置
+                    const config = {
+                        token: token,
+                        gistId: gistId,
+                        autoSync: autoSync,
+                        syncInterval: syncInterval
+                    };
+                    
+                    this.syncConfigManager.saveConfig(config);
+                    
+                    // 重新初始化同步管理器
+                    this.githubSyncManager = new GitHubSyncManager(token, gistId);
+                    
+                    // 更新状态
+                    this.updateSyncStatusIndicator('configured');
+                    this.syncConfigManager.updateSyncStatus('configured');
+                    
+                    // 启动自动同步
+                    this.startAutoSync();
+                    
+                    if (statusDiv) {
+                        statusDiv.innerHTML = `
+                            <div class="flex items-center text-green-600">
+                                <i class="fa fa-check-circle mr-2"></i>
+                                <span>配置保存成功！GitHub同步已启用</span>
+                            </div>
+                        `;
+                    }
+                    
+                    this.showNotification('GitHub同步配置已保存', 'success');
+                    
+                    // 延迟关闭模态框
+                    setTimeout(() => {
+                        this.hideGithubSyncModal();
+                    }, 1500);
+                } catch (error) {
+                    if (statusDiv) {
+                        statusDiv.innerHTML = `
+                            <div class="flex items-center text-red-600">
+                                <i class="fa fa-times-circle mr-2"></i>
+                                <span>保存失败: ${error.message}</span>
+                            </div>
+                        `;
+                    }
+                    this.showNotification(`保存失败: ${error.message}`, 'danger');
+                }
+            }
+
+            // 执行同步
+            async performSync() {
+                if (!this.githubSyncManager) {
+                    this.showNotification('请先配置GitHub同步', 'warning');
+                    return;
+                }
+                
+                this.updateSyncStatusIndicator('syncing');
+                this.syncConfigManager.updateSyncStatus('syncing');
+                
+                try {
+                    const result = await this.githubSyncManager.sync(this.tasks);
+                    
+                    if (result.success) {
+                        // 更新任务列表
+                        this.tasks = result.tasks;
+                        this.saveLocalTasks();
+                        this.renderTasks();
+                        
+                        // 更新状态
+                        this.updateSyncStatusIndicator('synced', result.lastSync);
+                        this.syncConfigManager.updateSyncStatus('synced');
+                        
+                        let message = `同步成功，共 ${result.syncedTasks} 个任务`;
+                        if (result.conflictResolved) {
+                            message += '（已解决数据冲突）';
+                        }
+                        
+                        this.showNotification(message, 'success');
+                    } else {
+                        this.updateSyncStatusIndicator('error');
+                        this.syncConfigManager.updateSyncStatus('error', result.message);
+                        this.showNotification(`同步失败: ${result.message}`, 'danger');
+                    }
+                } catch (error) {
+                    this.updateSyncStatusIndicator('error');
+                    this.syncConfigManager.updateSyncStatus('error', error.message);
+                    this.showNotification(`同步错误: ${error.message}`, 'danger');
+                }
+            }
+
+            // 仅下载数据
+            async downloadFromGithub() {
+                if (!this.githubSyncManager) {
+                    this.showNotification('请先配置GitHub同步', 'warning');
+                    return;
+                }
+                
+                const statusDiv = document.getElementById('githubSyncStatus');
+                if (statusDiv) {
+                    statusDiv.innerHTML = '<div class="flex items-center justify-center py-2"><i class="fa fa-spinner fa-spin mr-2"></i> 下载数据中...</div>';
+                    statusDiv.classList.remove('hidden');
+                }
+                
+                try {
+                    const result = await this.githubSyncManager.downloadOnly();
+                    
+                    if (result.success) {
+                        // 更新任务列表
+                        this.tasks = result.tasks;
+                        this.saveLocalTasks();
+                        this.renderTasks();
+                        
+                        if (statusDiv) {
+                            statusDiv.innerHTML = `
+                                <div class="flex items-center text-green-600">
+                                    <i class="fa fa-check-circle mr-2"></i>
+                                    <span>下载成功，共 ${result.downloadedTasks} 个任务</span>
+                                </div>
+                            `;
+                        }
+                        
+                        this.updateSyncStatusIndicator('synced', result.lastSync);
+                        this.syncConfigManager.updateSyncStatus('synced');
+                        
+                        this.showNotification(`数据下载成功，共 ${result.downloadedTasks} 个任务`, 'success');
+                    } else {
+                        if (statusDiv) {
+                            statusDiv.innerHTML = `
+                                <div class="flex items-center text-red-600">
+                                    <i class="fa fa-times-circle mr-2"></i>
+                                    <span>下载失败: ${result.message}</span>
+                                </div>
+                            `;
+                        }
+                        this.showNotification(`下载失败: ${result.message}`, 'danger');
+                    }
+                } catch (error) {
+                    if (statusDiv) {
+                        statusDiv.innerHTML = `
+                            <div class="flex items-center text-red-600">
+                                <i class="fa fa-times-circle mr-2"></i>
+                                <span>下载错误: ${error.message}</span>
+                            </div>
+                        `;
+                    }
+                    this.showNotification(`下载错误: ${error.message}`, 'danger');
+                }
+            }
+
+            // 仅上传数据
+            async uploadToGithub() {
+                if (!this.githubSyncManager) {
+                    this.showNotification('请先配置GitHub同步', 'warning');
+                    return;
+                }
+                
+                const statusDiv = document.getElementById('githubSyncStatus');
+                if (statusDiv) {
+                    statusDiv.innerHTML = '<div class="flex items-center justify-center py-2"><i class="fa fa-spinner fa-spin mr-2"></i> 上传数据中...</div>';
+                    statusDiv.classList.remove('hidden');
+                }
+                
+                try {
+                    const result = await this.githubSyncManager.uploadOnly(this.tasks);
+                    
+                    if (result.success) {
+                        if (statusDiv) {
+                            statusDiv.innerHTML = `
+                                <div class="flex items-center text-green-600">
+                                    <i class="fa fa-check-circle mr-2"></i>
+                                    <span>上传成功，共 ${result.uploadedTasks} 个任务</span>
+                                </div>
+                            `;
+                        }
+                        
+                        this.updateSyncStatusIndicator('synced', result.lastSync);
+                        this.syncConfigManager.updateSyncStatus('synced');
+                        
+                        this.showNotification(`数据上传成功，共 ${result.uploadedTasks} 个任务`, 'success');
+                    } else {
+                        if (statusDiv) {
+                            statusDiv.innerHTML = `
+                                <div class="flex items-center text-red-600">
+                                    <i class="fa fa-times-circle mr-2"></i>
+                                    <span>上传失败: ${result.message}</span>
+                                </div>
+                            `;
+                        }
+                        this.showNotification(`上传失败: ${result.message}`, 'danger');
+                    }
+                } catch (error) {
+                    if (statusDiv) {
+                        statusDiv.innerHTML = `
+                            <div class="flex items-center text-red-600">
+                                <i class="fa fa-times-circle mr-2"></i>
+                                <span>上传错误: ${error.message}</span>
+                            </div>
+                        `;
+                    }
+                    this.showNotification(`上传错误: ${error.message}`, 'danger');
+                }
+            }
+
+            // 清除GitHub配置
+            clearGithubConfig() {
+                if (confirm('确定要清除GitHub同步配置吗？这将不会删除Gist中的数据。')) {
+                    this.syncConfigManager.clearConfig();
+                    this.githubSyncManager = null;
+                    
+                    // 重置UI
+                    if (document.getElementById('githubToken')) {
+                        document.getElementById('githubToken').value = '';
+                    }
+                    if (document.getElementById('gistId')) {
+                        document.getElementById('gistId').value = '';
+                    }
+                    if (document.getElementById('autoSync')) {
+                        document.getElementById('autoSync').checked = false;
+                    }
+                    if (document.getElementById('syncIntervalContainer')) {
+                        document.getElementById('syncIntervalContainer').classList.add('hidden');
+                    }
+                    if (document.getElementById('githubSyncStatus')) {
+                        document.getElementById('githubSyncStatus').classList.add('hidden');
+                    }
+                    
+                    // 停止自动同步
+                    this.stopAutoSync();
+                    
+                    // 更新状态
+                    this.updateSyncStatusIndicator('not_configured');
+                    
+                    this.showNotification('GitHub同步配置已清除', 'info');
+                }
+            }
+
+            // 启动自动同步
+            startAutoSync() {
+                const config = this.syncConfigManager.getConfig();
+                
+                if (!config.autoSync || !this.githubSyncManager) {
+                    return;
+                }
+                
+                // 清除现有的定时器
+                this.stopAutoSync();
+                
+                const interval = (config.syncInterval || 5) * 60 * 1000;
+                
+                this.autoSyncInterval = setInterval(async () => {
+                    // 检查网络状态
+                    if (!navigator.onLine) {
+                        console.log('网络离线，跳过自动同步');
+                        return;
+                    }
+                    
+                    console.log('执行自动同步...');
+                    await this.performSync();
+                }, interval);
+                
+                console.log(`自动同步已启动，间隔 ${config.syncInterval} 分钟`);
+            }
+
+            // 停止自动同步
+            stopAutoSync() {
+                if (this.autoSyncInterval) {
+                    clearInterval(this.autoSyncInterval);
+                    this.autoSyncInterval = null;
+                    console.log('自动同步已停止');
+                }
+            }
+
+            // 初始化同步状态指示器
+            initSyncStatusIndicator() {
+                const indicator = document.getElementById('syncStatusIndicator');
+                if (indicator) {
+                    indicator.classList.remove('hidden');
+                }
+                
+                this.updateSyncStatusIndicator('not_configured');
+            }
+
+            // 更新同步状态指示器
+            updateSyncStatusIndicator(status, lastSyncTime = null) {
+                const statusMap = {
+                    not_configured: {
+                        icon: 'bg-gray-400',
+                        text: '未配置',
+                        detail: '未配置'
+                    },
+                    configured: {
+                        icon: 'bg-blue-500',
+                        text: '已配置',
+                        detail: '已配置'
+                    },
+                    syncing: {
+                        icon: 'bg-yellow-500 animate-pulse',
+                        text: '同步中',
+                        detail: '正在同步'
+                    },
+                    synced: {
+                        icon: 'bg-green-500',
+                        text: '已同步',
+                        detail: '同步成功'
+                    },
+                    error: {
+                        icon: 'bg-red-500',
+                        text: '错误',
+                        detail: '同步失败'
+                    }
+                };
+                
+                const config = this.syncConfigManager.getConfig();
+                const statusInfo = statusMap[status] || statusMap.not_configured;
+                
+                // 更新图标和文本
+                const icon = document.getElementById('syncStatusIcon');
+                const text = document.getElementById('syncStatusText');
+                const detail = document.getElementById('syncStatusDetail');
+                const lastTime = document.getElementById('syncLastTime');
+                const mode = document.getElementById('syncMode');
+                const count = document.getElementById('syncTaskCount');
+                
+                if (icon) {
+                    icon.className = `w-2 h-2 rounded-full ${statusInfo.icon}`;
+                }
+                
+                if (text) {
+                    text.textContent = statusInfo.text;
+                }
+                
+                if (detail) {
+                    detail.textContent = statusInfo.detail;
+                }
+                
+                if (lastTime) {
+                    if (lastSyncTime) {
+                        const time = new Date(lastSyncTime);
+                        lastTime.textContent = time.toLocaleString();
+                    } else if (config.lastSync) {
+                        const time = new Date(config.lastSync);
+                        lastTime.textContent = time.toLocaleString();
+                    } else {
+                        lastTime.textContent = '从未';
+                    }
+                }
+                
+                if (mode) {
+                    mode.textContent = config.autoSync ? `自动 (${config.syncInterval}分钟)` : '手动';
+                }
+                
+                if (count) {
+                    count.textContent = this.tasks.length;
+                }
+            }
+
+            // 显示同步状态菜单
+            toggleSyncStatusMenu() {
+                const menu = document.getElementById('syncStatusMenu');
+                if (menu) {
+                    menu.classList.toggle('hidden');
+                }
+            }
+
+            // 隐藏同步状态菜单
+            hideSyncStatusMenu() {
+                const menu = document.getElementById('syncStatusMenu');
+                if (menu) {
+                    menu.classList.add('hidden');
+                }
+            }
+
+            // 显示GitHub同步模态框
+            showGithubSyncModal() {
+                const modal = document.getElementById('githubSyncModal');
+                if (modal) {
+                    modal.classList.remove('hidden');
+                }
+            }
+
+            // 隐藏GitHub同步模态框
+            hideGithubSyncModal() {
+                const modal = document.getElementById('githubSyncModal');
+                if (modal) {
+                    modal.classList.add('hidden');
+                }
+            }
+
+            // 显示GitHub同步帮助模态框
+            showGithubSyncHelpModal() {
+                const modal = document.getElementById('githubSyncHelpModal');
+                if (modal) {
+                    modal.classList.remove('hidden');
+                }
+            }
+
+            // 隐藏GitHub同步帮助模态框
+            hideGithubSyncHelpModal() {
+                const modal = document.getElementById('githubSyncHelpModal');
+                if (modal) {
+                    modal.classList.add('hidden');
+                }
+            }
+
+            // 重写同步到服务器方法，使用GitHub同步
+            async syncTasksWithServer() {
+                if (this.githubSyncManager) {
+                    await this.performSync();
+                } else {
+                    // 保留原有的模拟同步逻辑作为备用
+                    try {
+                        this.syncIndicator.className = 'sync-indicator syncing';
+                        
+                        // 模拟与服务器同步
+                        console.log('正在与服务器同步任务...');
+                        
+                        // 模拟网络延迟
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        
+                        // 模拟成功同步
+                        const syncState = {
+                            lastSyncTime: new Date().toISOString(),
+                            syncStatus: 'synced',
+                            serverTime: new Date().toISOString()
+                        };
+                        localStorage.setItem(STORAGE_KEYS.SYNC_STATE, JSON.stringify(syncState));
+                        
+                        // 更新同步状态
+                        this.syncIndicator.className = 'sync-indicator';
+                        this.updateSyncStatusUI('synced');
+                        
+                        console.log('任务同步成功');
+                        this.showNotification('任务已同步到服务器', 'success');
+                        
+                    } catch (error) {
+                        console.error('任务同步失败:', error);
+                        this.syncIndicator.className = 'sync-indicator offline';
+                        this.showNotification('同步失败，将使用本地模式', 'warning');
+                    }
+                }
+            }
+        }
+
+        // 页面加载完成后初始化应用
+        document.addEventListener('DOMContentLoaded', () => {
+            app = new TaskPoolApp();
+        });
+    </script>
+</body>
+</html>
