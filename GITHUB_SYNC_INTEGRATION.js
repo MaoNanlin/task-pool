@@ -9,6 +9,91 @@ class GitHubSyncManager {
         this.apiUrl = `https://api.github.com/gists/${gistId}`;  // GitHub API URL
         this.lastSyncTime = null;     // 上次同步时间
         this.isSyncing = false;       // 同步状态标志
+        this.isOnline = navigator.onLine; // 当前网络状态
+        this.networkListeners = [];   // 网络状态变化监听器
+        
+        // 监听网络状态变化
+        this.setupNetworkListeners();
+    }
+    
+    // 设置网络状态监听器
+    setupNetworkListeners() {
+        const updateNetworkStatus = () => {
+            this.isOnline = navigator.onLine;
+            console.log(`网络状态变化: ${this.isOnline ? '在线' : '离线'}`);
+            this.notifyNetworkStatusListeners();
+        };
+        
+        window.addEventListener('online', updateNetworkStatus);
+        window.addEventListener('offline', updateNetworkStatus);
+        
+        // 保存监听器以便清理
+        this.networkListeners.push(updateNetworkStatus);
+    }
+    
+    // 注册网络状态变化监听器
+    onNetworkStatusChange(callback) {
+        this.networkListeners.push(callback);
+    }
+    
+    // 通知所有网络状态监听器
+    notifyNetworkStatusListeners() {
+        this.networkListeners.forEach(callback => {
+            try {
+                callback(this.isOnline);
+            } catch (error) {
+                console.error('网络状态监听器错误:', error);
+            }
+        });
+    }
+    
+    // 检查当前网络状态
+    checkNetworkStatus() {
+        this.isOnline = navigator.onLine;
+        return this.isOnline;
+    }
+    
+    // 获取网络类型（WiFi/移动网络/未知）
+    getNetworkType() {
+        if (!navigator.connection) {
+            return 'unknown';
+        }
+        
+        const connection = navigator.connection;
+        
+        // 检测网络类型
+        if (connection.type === 'wifi' || connection.effectiveType === '4g') {
+            return 'wifi';
+        } else if (connection.type === 'cellular' || 
+                   connection.effectiveType === '3g' || 
+                   connection.effectiveType === '2g' || 
+                   connection.effectiveType === 'slow-2g') {
+            return 'cellular';
+        }
+        
+        return 'unknown';
+    }
+    
+    // 获取推荐的同步间隔（根据网络类型）
+    getRecommendedSyncInterval() {
+        const networkType = this.getNetworkType();
+        
+        // 根据网络类型推荐不同的同步间隔
+        switch (networkType) {
+            case 'wifi':
+                return 5; // WiFi下5分钟
+            case 'cellular':
+                return 15; // 移动网络下15分钟
+            default:
+                return 10; // 其他情况10分钟
+        }
+    }
+    
+    // 清理网络状态监听器
+    cleanupNetworkListeners() {
+        window.removeEventListener('online', this.networkListeners[0]);
+        window.removeEventListener('offline', this.networkListeners[0]);
+        this.networkListeners = [];
     }
     
     // 获取GitHub API请求头
@@ -171,61 +256,257 @@ class GitHubSyncManager {
     // 冲突解决策略
     resolveConflict(localData, remoteData) {
         // 确保数据结构完整
-        localData = localData || { tasks: [], lastSync: null };
-        remoteData = remoteData || { tasks: [], lastSync: null };
+        localData = this.sanitizeSyncData(localData);
+        remoteData = this.sanitizeSyncData(remoteData);
         
-        const localTime = localData.lastSync ? new Date(localData.lastSync) : new Date(0);
-        const remoteTime = remoteData.lastSync ? new Date(remoteData.lastSync) : new Date(0);
+        console.log('冲突解决开始:');
+        console.log('本地数据:', JSON.stringify(localData, null, 2));
+        console.log('远程数据:', JSON.stringify(remoteData, null, 2));
+        
+        // 验证并处理时间戳
+        const localTime = this.parseTimestamp(localData.lastSync);
+        const remoteTime = this.parseTimestamp(remoteData.lastSync);
         
         console.log('冲突检测:');
         console.log('- 本地时间:', localTime);
         console.log('- 远程时间:', remoteTime);
+        console.log('- 本地任务数:', localData.tasks.length);
+        console.log('- 远程任务数:', remoteData.tasks.length);
         
-        // 策略1: 以最新数据为准
-        if (remoteTime > localTime) {
-            console.log('选择远程数据（更新）');
-            return remoteData;
-        } else if (localTime > remoteTime) {
-            console.log('选择本地数据（更新）');
-            return localData;
+        let resolvedData;
+        
+        // 计算时间差（毫秒）
+        const timeDiff = Math.abs(remoteTime - localTime);
+        const isSignificantDiff = timeDiff > 1000; // 超过1秒视为有效时间差
+        
+        if (isSignificantDiff && remoteTime > localTime) {
+            console.log(`选择远程数据（更新，时间差: ${timeDiff}ms）`);
+            resolvedData = { ...remoteData };
+        } else if (isSignificantDiff && localTime > remoteTime) {
+            console.log(`选择本地数据（更新，时间差: ${timeDiff}ms）`);
+            resolvedData = { ...localData };
         } else {
-            // 时间相同时，合并数据
-            console.log('时间相同，合并数据');
+            // 时间相近或相同，进行详细的任务合并
+            console.log('时间相近或相同，开始详细任务合并');
+            resolvedData = this.mergeTasksDetailed(localData, remoteData);
+        }
+        
+        // 更新同步信息
+        resolvedData = {
+            ...resolvedData,
+            lastSync: new Date().toISOString(),
+            version: '1.1', // 升级版本号
+            conflictResolved: true,
+            resolutionTime: new Date().toISOString(),
+            resolutionStrategy: isSignificantDiff ? 'time_based' : 'detailed_merge',
+            timeDiff: timeDiff
+        };
+        
+        console.log('冲突解决完成:', resolvedData);
+        return resolvedData;
+    }
+    
+    // 清理和验证同步数据
+    sanitizeSyncData(data) {
+        if (!data || typeof data !== 'object') {
+            return { tasks: [], lastSync: null };
+        }
+        
+        return {
+            tasks: Array.isArray(data.tasks) ? data.tasks : [],
+            lastSync: data.lastSync,
+            version: data.version || '1.0'
+        };
+    }
+    
+    // 安全解析时间戳
+    parseTimestamp(timestamp) {
+        if (!timestamp) {
+            return new Date(0); // 1970-01-01
+        }
+        
+        try {
+            const date = new Date(timestamp);
+            // 验证是否为有效日期
+            if (isNaN(date.getTime())) {
+                return new Date(0);
+            }
+            return date;
+        } catch (error) {
+            console.error('解析时间戳错误:', error);
+            return new Date(0);
+        }
+    }
+    
+    // 详细的任务合并策略
+    mergeTasksDetailed(localData, remoteData) {
+        const taskMap = new Map();
+        const conflictedTasks = [];
+        
+        // 先添加所有本地任务
+        localData.tasks.forEach(task => {
+            const safeTask = this.sanitizeTask(task, 'local');
+            taskMap.set(safeTask.id, safeTask);
+        });
+        
+        // 处理远程任务
+        remoteData.tasks.forEach(remoteTask => {
+            const safeRemoteTask = this.sanitizeTask(remoteTask, 'remote');
+            const existingTask = taskMap.get(safeRemoteTask.id);
             
-            // 创建任务映射，便于快速查找
-            const taskMap = new Map();
-            
-            // 先添加本地任务
-            localData.tasks.forEach(task => {
-                taskMap.set(task.id, { ...task, source: 'local' });
-            });
-            
-            // 再添加远程任务，如果ID相同则比较更新时间
-            remoteData.tasks.forEach(task => {
-                const existingTask = taskMap.get(task.id);
-                if (existingTask) {
-                    const existingTime = new Date(existingTask.updatedAt || existingTask.createdAt);
-                    const remoteTaskTime = new Date(task.updatedAt || task.createdAt);
-                    
-                    if (remoteTaskTime > existingTime) {
-                        taskMap.set(task.id, { ...task, source: 'remote' });
-                    }
-                } else {
-                    taskMap.set(task.id, { ...task, source: 'remote' });
+            if (existingTask) {
+                // 任务已存在，比较详细信息
+                const mergedTask = this.mergeSingleTask(existingTask, safeRemoteTask);
+                taskMap.set(safeRemoteTask.id, mergedTask);
+                
+                // 如果是冲突合并，记录冲突信息
+                if (mergedTask.wasConflicted) {
+                    conflictedTasks.push(mergedTask.id);
                 }
-            });
-            
-            // 转换回数组
-            const mergedTasks = Array.from(taskMap.values());
-            
+            } else {
+                // 新任务，直接添加
+                taskMap.set(safeRemoteTask.id, safeRemoteTask);
+            }
+        });
+        
+        // 转换回数组
+        const mergedTasks = Array.from(taskMap.values());
+        
+        console.log(`任务合并完成: ${mergedTasks.length}个任务，${conflictedTasks.length}个冲突`);
+        if (conflictedTasks.length > 0) {
+            console.log('冲突的任务ID:', conflictedTasks);
+        }
+        
+        return {
+            tasks: mergedTasks,
+            conflicts: conflictedTasks
+        };
+    }
+    
+    // 清理和验证单个任务
+    sanitizeTask(task, source) {
+        if (!task || typeof task !== 'object') {
             return {
-                tasks: mergedTasks,
-                lastSync: new Date().toISOString(),
-                version: '1.0',
-                conflictResolved: true,
-                resolutionTime: new Date().toISOString()
+                id: `invalid_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                title: '无效任务',
+                description: '',
+                priority: 'medium',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                completed: false,
+                source: source || 'unknown',
+                wasInvalid: true
             };
         }
+        
+        // 确保任务有必要的字段
+        return {
+            id: task.id || `generated_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            title: task.title || '未命名任务',
+            description: task.description || '',
+            priority: task.priority || 'medium',
+            createdAt: task.createdAt || new Date().toISOString(),
+            updatedAt: task.updatedAt || task.createdAt || new Date().toISOString(),
+            completed: !!task.completed,
+            deadline: task.deadline,
+            tags: Array.isArray(task.tags) ? task.tags : [],
+            source: source || 'unknown',
+            wasConflicted: false,
+            wasInvalid: false
+        };
+    }
+    
+    // 合并单个任务的详细信息
+    mergeSingleTask(localTask, remoteTask) {
+        // 解析任务的更新时间
+        const localUpdateTime = this.parseTimestamp(localTask.updatedAt);
+        const remoteUpdateTime = this.parseTimestamp(remoteTask.updatedAt);
+        
+        console.log(`合并任务 ${localTask.id}:`);
+        console.log(`- 本地更新时间: ${localUpdateTime}`);
+        console.log(`- 远程更新时间: ${remoteUpdateTime}`);
+        
+        // 如果有明显的时间差，使用最新的任务
+        const timeDiff = Math.abs(remoteUpdateTime - localUpdateTime);
+        if (timeDiff > 1000) {
+            if (remoteUpdateTime > localUpdateTime) {
+                console.log('  - 使用远程任务（更新）');
+                return { ...remoteTask, wasConflicted: true };
+            } else {
+                console.log('  - 使用本地任务（更新）');
+                return { ...localTask, wasConflicted: true };
+            }
+        }
+        
+        // 时间相近，进行字段级合并
+        console.log('  - 字段级合并');
+        
+        // 确定哪个任务字段更新更频繁
+        const mergedTask = { ...localTask };
+        let wasConflicted = false;
+        
+        // 合并优先级字段（使用较高优先级）
+        const priorityOrder = { high: 3, medium: 2, low: 1 };
+        if (priorityOrder[remoteTask.priority] > priorityOrder[localTask.priority]) {
+            mergedTask.priority = remoteTask.priority;
+            wasConflicted = true;
+        }
+        
+        // 合并完成状态（只要有一个标记为完成，就标记为完成）
+        if (!localTask.completed && remoteTask.completed) {
+            mergedTask.completed = true;
+            wasConflicted = true;
+        }
+        
+        // 合并标题（使用较长的标题）
+        if (remoteTask.title && remoteTask.title.length > localTask.title.length) {
+            mergedTask.title = remoteTask.title;
+            wasConflicted = true;
+        }
+        
+        // 合并描述（合并内容，保留较长的或更新的）
+        const localDescTime = this.parseTimestamp(localTask.updatedAt);
+        const remoteDescTime = this.parseTimestamp(remoteTask.updatedAt);
+        if (remoteTask.description) {
+            if (!localTask.description || remoteDescTime > localDescTime) {
+                mergedTask.description = remoteTask.description;
+                wasConflicted = true;
+            } else if (remoteTask.description !== localTask.description) {
+                // 如果内容不同但时间相近，合并描述
+                mergedTask.description = `${localTask.description}\n\n--- 远程添加 ---\n${remoteTask.description}`;
+                wasConflicted = true;
+            }
+        }
+        
+        // 合并截止日期（使用较早的截止日期）
+        if (remoteTask.deadline) {
+            const remoteDeadline = this.parseTimestamp(remoteTask.deadline);
+            if (!localTask.deadline || remoteDeadline < this.parseTimestamp(localTask.deadline)) {
+                mergedTask.deadline = remoteTask.deadline;
+                wasConflicted = true;
+            }
+        }
+        
+        // 合并标签（去重）
+        const localTags = new Set(localTask.tags || []);
+        const remoteTags = new Set(remoteTask.tags || []);
+        const mergedTags = [...new Set([...localTags, ...remoteTags])];
+        if (mergedTags.length !== localTags.size) {
+            mergedTask.tags = mergedTags;
+            wasConflicted = true;
+        }
+        
+        // 更新合并信息
+        mergedTask.updatedAt = new Date().toISOString();
+        mergedTask.wasConflicted = wasConflicted;
+        mergedTask.mergeInfo = {
+            localSource: localTask.source,
+            remoteSource: remoteTask.source,
+            mergeTime: new Date().toISOString(),
+            timeDiff: timeDiff
+        };
+        
+        return mergedTask;
     }
     
     // 获取本地数据
@@ -248,103 +529,237 @@ class GitHubSyncManager {
         }
     }
     
+    // 分类错误类型
+    classifyError(error) {
+        if (!error) return 'unknown';
+        
+        const errorMessage = error.toString().toLowerCase();
+        
+        // 网络错误
+        if (errorMessage.includes('network') || errorMessage.includes('offline') || 
+            errorMessage.includes('timeout') || errorMessage.includes('connection') ||
+            errorMessage.includes('fetch')) {
+            return 'network';
+        }
+        
+        // 认证错误
+        if (errorMessage.includes('401') || errorMessage.includes('unauthorized') ||
+            errorMessage.includes('invalid token')) {
+            return 'auth';
+        }
+        
+        // 权限错误
+        if (errorMessage.includes('403') || errorMessage.includes('forbidden')) {
+            return 'permission';
+        }
+        
+        // 资源不存在
+        if (errorMessage.includes('404') || errorMessage.includes('not found')) {
+            return 'not_found';
+        }
+        
+        // 数据格式错误
+        if (errorMessage.includes('invalid format') || errorMessage.includes('json parse') ||
+            errorMessage.includes('data invalid')) {
+            return 'data_format';
+        }
+        
+        // 其他错误
+        return 'unknown';
+    }
+    
     // 执行完整同步
-    async sync(tasks) {
+    async sync(tasks, maxRetries = 3, retryDelay = 2000) {
         if (this.isSyncing) {
             console.log('同步已在进行中');
             return { success: false, message: '同步已在进行中' };
         }
         
-        this.isSyncing = true;
+        // 检查网络状态
+        if (!this.checkNetworkStatus()) {
+            console.log('当前处于离线状态，无法同步');
+            return { success: false, message: '当前处于离线状态，无法同步', errorType: 'network' };
+        }
         
-        try {
-            console.log('开始同步...');
-            
-            // 步骤1: 获取远程数据
-            console.log('步骤1: 获取远程数据');
-            const remoteData = await this.fetchRemoteData();
-            
-            // 步骤2: 获取本地数据
-            console.log('步骤2: 获取本地数据');
-            const localData = this.getLocalData(tasks);
-            
-            // 步骤3: 解决冲突
-            console.log('步骤3: 解决冲突');
-            const resolvedData = this.resolveConflict(localData, remoteData);
-            
-            // 步骤4: 上传解决后的数据
-            console.log('步骤4: 上传数据到Gist');
-            await this.uploadLocalData(resolvedData);
-            
-            console.log('同步完成');
-            
-            return { 
-                success: true, 
-                message: '同步成功',
-                tasks: resolvedData.tasks,
-                syncedTasks: resolvedData.tasks.length,
-                lastSync: resolvedData.lastSync,
-                conflictResolved: resolvedData.conflictResolved || false
-            };
-        } catch (error) {
-            console.error('同步错误:', error);
-            return { 
-                success: false, 
-                message: error.message || '同步失败',
-                error: error.toString()
-            };
-        } finally {
-            this.isSyncing = false;
+        this.isSyncing = true;
+        let retries = 0;
+        
+        while (retries <= maxRetries) {
+            try {
+                console.log(`开始同步... (尝试 ${retries + 1}/${maxRetries + 1})`);
+                
+                // 步骤1: 获取远程数据
+                console.log('步骤1: 获取远程数据');
+                const remoteData = await this.fetchRemoteData();
+                
+                // 步骤2: 获取本地数据
+                console.log('步骤2: 获取本地数据');
+                const localData = this.getLocalData(tasks);
+                
+                // 步骤3: 解决冲突
+                console.log('步骤3: 解决冲突');
+                const resolvedData = this.resolveConflict(localData, remoteData);
+                
+                // 步骤4: 上传解决后的数据
+                console.log('步骤4: 上传数据到Gist');
+                await this.uploadLocalData(resolvedData);
+                
+                console.log('同步完成');
+                
+                return { 
+                    success: true, 
+                    message: '同步成功',
+                    tasks: resolvedData.tasks,
+                    syncedTasks: resolvedData.tasks.length,
+                    lastSync: resolvedData.lastSync,
+                    conflictResolved: resolvedData.conflictResolved || false,
+                    retries: retries
+                };
+            } catch (error) {
+                console.error(`同步错误 (尝试 ${retries + 1}/${maxRetries + 1}):`, error);
+                
+                retries++;
+                
+                // 如果达到最大重试次数，返回失败
+                if (retries > maxRetries) {
+                    const errorType = this.classifyError(error);
+                    return { 
+                        success: false, 
+                        message: error.message || '同步失败',
+                        error: error.toString(),
+                        errorType: errorType,
+                        retries: retries - 1
+                    };
+                }
+                
+                // 重试前检查网络状态
+                if (!this.checkNetworkStatus()) {
+                    console.log('网络已断开，停止重试');
+                    return { 
+                        success: false, 
+                        message: '网络已断开，同步失败',
+                        errorType: 'network',
+                        retries: retries - 1
+                    };
+                }
+                
+                // 等待重试延迟
+                console.log(`等待 ${retryDelay}ms 后重试...`);
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
+                
+                // 指数退避策略
+                retryDelay *= 2;
+            }
         }
     }
     
     // 仅下载数据（不上传）
-    async downloadOnly() {
-        try {
-            console.log('开始下载数据...');
-            
-            const remoteData = await this.fetchRemoteData();
-            
-            console.log('数据下载完成');
-            
-            return {
-                success: true,
-                message: '数据下载成功',
-                tasks: remoteData.tasks,
-                downloadedTasks: remoteData.tasks.length,
-                lastSync: remoteData.lastSync
-            };
-        } catch (error) {
-            console.error('下载数据错误:', error);
-            return {
-                success: false,
-                message: error.message || '下载失败'
-            };
+    async downloadOnly(maxRetries = 2, retryDelay = 1500) {
+        let retries = 0;
+        
+        while (retries <= maxRetries) {
+            try {
+                console.log(`开始下载数据... (尝试 ${retries + 1}/${maxRetries + 1})`);
+                
+                const remoteData = await this.fetchRemoteData();
+                
+                console.log('数据下载完成');
+                
+                return {
+                    success: true,
+                    message: '数据下载成功',
+                    tasks: remoteData.tasks,
+                    downloadedTasks: remoteData.tasks.length,
+                    lastSync: remoteData.lastSync,
+                    retries: retries
+                };
+            } catch (error) {
+                console.error(`下载数据错误 (尝试 ${retries + 1}/${maxRetries + 1}):`, error);
+                
+                retries++;
+                
+                if (retries > maxRetries) {
+                    const errorType = this.classifyError(error);
+                    return {
+                        success: false,
+                        message: error.message || '下载失败',
+                        error: error.toString(),
+                        errorType: errorType,
+                        retries: retries - 1
+                    };
+                }
+                
+                // 重试前检查网络状态
+                if (!this.checkNetworkStatus()) {
+                    console.log('网络已断开，停止下载重试');
+                    return {
+                        success: false,
+                        message: '网络已断开，下载失败',
+                        errorType: 'network',
+                        retries: retries - 1
+                    };
+                }
+                
+                // 等待重试延迟
+                console.log(`等待 ${retryDelay}ms 后重试下载...`);
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
+                retryDelay *= 2;
+            }
         }
     }
     
     // 仅上传数据（不下载）
-    async uploadOnly(tasks) {
-        try {
-            console.log('开始上传数据...');
-            
-            const localData = this.getLocalData(tasks);
-            await this.uploadLocalData(localData);
-            
-            console.log('数据上传完成');
-            
-            return {
-                success: true,
-                message: '数据上传成功',
-                uploadedTasks: localData.tasks.length,
-                lastSync: this.lastSyncTime
-            };
-        } catch (error) {
-            console.error('上传数据错误:', error);
-            return {
-                success: false,
-                message: error.message || '上传失败'
-            };
+    async uploadOnly(tasks, maxRetries = 2, retryDelay = 1500) {
+        let retries = 0;
+        
+        while (retries <= maxRetries) {
+            try {
+                console.log(`开始上传数据... (尝试 ${retries + 1}/${maxRetries + 1})`);
+                
+                const localData = this.getLocalData(tasks);
+                await this.uploadLocalData(localData);
+                
+                console.log('数据上传完成');
+                
+                return {
+                    success: true,
+                    message: '数据上传成功',
+                    uploadedTasks: localData.tasks.length,
+                    lastSync: this.lastSyncTime,
+                    retries: retries
+                };
+            } catch (error) {
+                console.error(`上传数据错误 (尝试 ${retries + 1}/${maxRetries + 1}):`, error);
+                
+                retries++;
+                
+                if (retries > maxRetries) {
+                    const errorType = this.classifyError(error);
+                    return {
+                        success: false,
+                        message: error.message || '上传失败',
+                        error: error.toString(),
+                        errorType: errorType,
+                        retries: retries - 1
+                    };
+                }
+                
+                // 重试前检查网络状态
+                if (!this.checkNetworkStatus()) {
+                    console.log('网络已断开，停止上传重试');
+                    return {
+                        success: false,
+                        message: '网络已断开，上传失败',
+                        errorType: 'network',
+                        retries: retries - 1
+                    };
+                }
+                
+                // 等待重试延迟
+                console.log(`等待 ${retryDelay}ms 后重试上传...`);
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
+                retryDelay *= 2;
+            }
         }
     }
 }
@@ -369,7 +784,17 @@ class SyncConfigManager {
     getConfig() {
         try {
             const config = localStorage.getItem(this.configKey);
-            return config ? JSON.parse(config) : { ...this.defaultConfig };
+            const currentConfig = config ? JSON.parse(config) : { ...this.defaultConfig };
+            
+            // 如果是自动同步且未指定固定间隔，根据网络类型推荐
+            if (currentConfig.autoSync && currentConfig.syncInterval === this.defaultConfig.syncInterval) {
+                // 创建临时实例获取网络类型
+                const tempSyncManager = new GitHubSyncManager('', '');
+                currentConfig.recommendedInterval = tempSyncManager.getRecommendedSyncInterval();
+                tempSyncManager.cleanupNetworkListeners();
+            }
+            
+            return currentConfig;
         } catch (error) {
             console.error('获取配置错误:', error);
             return { ...this.defaultConfig };

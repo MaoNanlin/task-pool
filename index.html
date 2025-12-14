@@ -636,7 +636,7 @@
                         // 如果启用了自动同步，启动自动同步
                         const savedConfig = this.syncConfigManager.getConfig();
                         if (savedConfig.autoSync || (typeof GITHUB_CONFIG !== 'undefined' && GITHUB_CONFIG.SYNC_ENABLED)) {
-                            this.startAutoSync(savedConfig.syncInterval || (typeof GITHUB_CONFIG !== 'undefined' ? GITHUB_CONFIG.SYNC_INTERVAL : 5));
+                            this.startAutoSync();
                         }
                     }
                     
@@ -711,20 +711,7 @@
                 }
             }
 
-            // 启动自动同步
-            startAutoSync(intervalMinutes = 5) {
-                if (this.autoSyncInterval) {
-                    clearInterval(this.autoSyncInterval);
-                }
-                
-                this.autoSyncInterval = setInterval(() => {
-                    if (navigator.onLine) {
-                        this.syncFromGithub();
-                    }
-                }, intervalMinutes * 60 * 1000);
-                
-                console.log(`自动同步已启动，间隔${intervalMinutes}分钟`);
-            }
+
 
             // 更新同步状态UI
             updateSyncStatusUI(status, message = '') {
@@ -2627,12 +2614,34 @@
                         if (result.conflictResolved) {
                             message += '（已解决数据冲突）';
                         }
+                        if (result.retries > 0) {
+                            message += `（自动重试 ${result.retries} 次）`;
+                        }
                         
                         this.showNotification(message, 'success');
                     } else {
                         this.updateSyncStatusIndicator('error');
                         this.syncConfigManager.updateSyncStatus('error', result.message);
-                        this.showNotification(`同步失败: ${result.message}`, 'danger');
+                        
+                        // 根据错误类型提供不同的提示
+                        let message = `同步失败: ${result.message}`;
+                        if (result.errorType === 'network') {
+                            message += '\n请检查网络连接后重试';
+                        } else if (result.errorType === 'auth') {
+                            message += '\nGitHub Token可能已过期或无效';
+                        } else if (result.errorType === 'permission') {
+                            message += '\n权限不足，无法访问Gist';
+                        } else if (result.errorType === 'not_found') {
+                            message += '\nGist不存在或无访问权限';
+                        } else if (result.errorType === 'data_format') {
+                            message += '\n数据格式错误，请检查同步数据';
+                        }
+                        
+                        if (result.retries > 0) {
+                            message += `\n已自动重试 ${result.retries} 次`;
+                        }
+                        
+                        this.showNotification(message, 'danger');
                     }
                 } catch (error) {
                     this.updateSyncStatusIndicator('error');
