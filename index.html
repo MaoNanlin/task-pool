@@ -32,10 +32,10 @@
                         high: '#ef4444',
                         medium: '#f59e0b',
                         low: '#10b981'
-                    },
+,
                     fontFamily: {
                         sans: ['Inter', 'system-ui', 'sans-serif']
-                    },
+,
                     animation: {
                         'fade-in': 'fadeIn 0.3s ease-in-out',
                         'slide-in': 'slideIn 0.3s ease-in-out',
@@ -133,6 +133,23 @@
             .text-high { color: #ef4444; }
             .text-medium { color: #f59e0b; }
             .text-low { color: #10b981; }
+            
+            /* 折叠功能样式 */
+            #addTaskContainer.collapsed > div:not(:first-child) {
+                display: none;
+            }
+            
+            #addTaskContainer.collapsed {
+                padding-bottom: 2rem;
+            }
+            
+            #collapseBtn {
+                transition: transform 0.3s ease;
+            }
+            
+            #addTaskContainer.collapsed #collapseBtn {
+                transform: rotate(180deg);
+            }
         }
     </style>
 </head>
@@ -157,6 +174,9 @@
                     </div>
                 </div>
                 <div class="flex items-center space-x-3">
+                    <button id="syncSettingsBtn" class="px-3 py-1 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                        <i class="fa fa-cog"></i> 配置
+                    </button>
                     <div id="syncIndicator" class="sync-indicator cursor-pointer" title="点击同步">
                         <i class="fa fa-refresh"></i>
                     </div>
@@ -165,8 +185,13 @@
         </div>
 
         <!-- 添加任务区域 -->
-        <div class="bg-white rounded-2xl shadow-lg p-6 mb-6 animate-fade-in">
-            <h2 class="text-xl font-bold text-gray-800 mb-4">添加新任务</h2>
+        <div id="addTaskContainer" class="bg-white rounded-2xl shadow-lg p-6 mb-6 animate-fade-in">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-gray-800">添加新任务</h2>
+                <button id="collapseBtn" class="text-gray-500 hover:text-gray-700 transition-colors">
+                    <i class="fa fa-chevron-up"></i>
+                </button>
+            </div>
             <div class="mb-4">
                 <input 
                     type="text" 
@@ -724,11 +749,23 @@
                 this.notificationTitle = document.getElementById('notificationTitle');
                 this.notificationMessage = document.getElementById('notificationMessage');
                 this.closeNotification = document.getElementById('closeNotification');
+                
+                // 折叠功能
+                this.addTaskContainer = document.getElementById('addTaskContainer');
+                this.collapseBtn = document.getElementById('collapseBtn');
             }
 
             // 模态框控制方法
             hideEditModal() {
                 this.editTaskModal.classList.add('hidden');
+            }
+
+            // 显示GitHub同步配置模态框
+            showGithubSyncModal() {
+                const modal = document.getElementById('githubSyncModal');
+                if (modal) {
+                    modal.classList.remove('hidden');
+                }
             }
 
             bindEvents() {
@@ -821,6 +858,11 @@
                 this.syncIndicator.addEventListener('click', () => {
                     this.manualSync();
                 });
+                
+                // 同步设置按钮事件
+                document.getElementById('syncSettingsBtn').addEventListener('click', () => {
+                    this.showGithubSyncModal();
+                });
 
                 // 网络状态监听
                 window.addEventListener('online', () => {
@@ -834,6 +876,16 @@
                     this.isOnline = false;
                     this.updateSyncStatusUI('error', '网络连接已断开');
                 });
+                
+                // 折叠按钮事件
+                this.collapseBtn.addEventListener('click', () => {
+                    this.toggleAddTaskSection();
+                });
+            }
+            
+            // 切换添加任务区域的折叠/展开状态
+            toggleAddTaskSection() {
+                this.addTaskContainer.classList.toggle('collapsed');
             }
 
             initApp() {
@@ -1024,7 +1076,7 @@
                         
                         // 根据当前层级筛选可用的父任务
                         const parentLevel = this.currentLevel === 2 ? 1 : 2;
-                        const availableParents = this.tasks.filter(task => 
+                        const availableParents = this.filteredTasks.filter(task => 
                             task.level === parentLevel && !task.completed
                         );
                         
@@ -1165,16 +1217,20 @@
                 if (this.dueDateInput) {
                     this.dueDateInput.value = '';
                     this.dueDateInput.dataset.noDueDate = 'false';
-                    // 重置为默认值（明天）
-                    const tomorrow = new Date();
-                    tomorrow.setDate(tomorrow.getDate() + 1);
-                    if (typeof flatpickr !== 'undefined') {
+                }
+                
+                // 更新父任务下拉菜单，确保新创建的任务出现在可选列表中
+                this.updateParentTaskOptions();
+                
+                // 重置为默认值（明天）
+                const tomorrow = new Date();
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                if (typeof flatpickr !== 'undefined') {
                         const instance = flatpickr.getInstance(this.dueDateInput);
                         if (instance) {
                             instance.setDate(tomorrow);
                         }
                     }
-                }
                 
                 // 更新父任务选择UI
                 const parentTaskSelectContainer = document.getElementById('parentTaskSelectContainer');
@@ -1193,12 +1249,12 @@
                 const rootTasks = [];
                 
                 // 首先创建所有任务的映射
-                this.tasks.forEach(task => {
+                this.filteredTasks.forEach(task => {
                     taskMap.set(task.id, { ...task, children: [] });
                 });
                 
                 // 然后构建任务树
-                this.tasks.forEach(task => {
+                this.filteredTasks.forEach(task => {
                     if (task.parentId) {
                         const parent = taskMap.get(task.parentId);
                         if (parent) {
@@ -1594,6 +1650,8 @@
                     const saved = localStorage.getItem(STORAGE_KEYS.TASKS);
                     if (saved) {
                         this.tasks = JSON.parse(saved);
+                        // 迁移旧任务数据到新格式
+                        this.migrateOldTasks();
                     }
                     
                     const savedExpanded = localStorage.getItem('taskPoolExpanded');
@@ -1610,6 +1668,56 @@
                 } catch (error) {
                     console.error('加载本地任务失败:', error);
                     this.tasks = [];
+                }
+            }
+
+            // 迁移旧任务数据到新格式
+            migrateOldTasks() {
+                const hasOldTasks = this.tasks.some(task => 
+                    !task.hasOwnProperty('level') || 
+                    !task.hasOwnProperty('parentId') || 
+                    !task.hasOwnProperty('createdAt') || 
+                    !task.hasOwnProperty('updatedAt')
+                );
+
+                if (hasOldTasks) {
+                    console.log('开始迁移旧任务数据...');
+                    const migratedTasks = this.tasks.map(task => {
+                        // 为旧任务添加必要字段
+                        const migrated = {
+                            ...task,
+                            level: task.level || 1, // 默认大任务
+                            parentId: task.parentId || null,
+                            createdAt: task.createdAt || new Date().toISOString(),
+                            updatedAt: task.updatedAt || new Date().toISOString()
+                        };
+                        
+                        // 处理空父任务引用的问题
+                        if (migrated.parentId) {
+                            const parentExists = this.tasks.some(t => t.id === migrated.parentId);
+                            if (!parentExists) {
+                                migrated.parentId = null;
+                                migrated.level = 1;
+                            }
+                        }
+                        
+                        // 确保层级关系正确
+                        if (migrated.parentId) {
+                            const parentTask = this.tasks.find(t => t.id === migrated.parentId);
+                            if (parentTask) {
+                                migrated.level = parentTask.level ? parentTask.level + 1 : 2;
+                            } else {
+                                migrated.parentId = null;
+                                migrated.level = 1;
+                            }
+                        }
+                        
+                        return migrated;
+                    });
+                    
+                    this.tasks = migratedTasks;
+                    this.saveLocalTasks();
+                    console.log('旧任务数据迁移完成');
                 }
             }
 
