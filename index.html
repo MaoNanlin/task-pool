@@ -1284,23 +1284,67 @@
                 const completedClass = task.completed ? 'task-completed' : '';
                 
                 let dueDateText = '';
-                if (task.dueDate === null) {
+                if (task.dueDate === null || task.dueDate === '' || task.dueDate === undefined) {
                     dueDateText = `<span class="text-gray-500">无截止日期</span>`;
                 } else {
-                    const dueDate = new Date(task.dueDate);
-                    const now = new Date();
-                    const isOverdue = !task.completed && dueDate < now;
-                    const isToday = dueDate.toDateString() === now.toDateString();
-                    const isTomorrow = new Date(now.getTime() + 86400000).toDateString() === dueDate.toDateString();
+                    // 尝试多种方式解析日期，提高兼容性
+                    let dueDate;
+                    let parsedSuccessfully = false;
                     
-                    if (isOverdue) {
-                        dueDateText = `<span class="text-danger">已逾期</span>`;
-                    } else if (isToday) {
-                        dueDateText = `<span class="text-warning">今天</span>`;
-                    } else if (isTomorrow) {
-                        dueDateText = `<span class="text-info">明天</span>`;
+                    // 尝试1: 直接解析
+                    dueDate = new Date(task.dueDate);
+                    if (!isNaN(dueDate.getTime())) {
+                        parsedSuccessfully = true;
+                    } 
+                    // 尝试2: 处理字符串类型的日期
+                    else if (typeof task.dueDate === 'string') {
+                        // 尝试去除时区信息
+                        const withoutTz = task.dueDate.replace(/Z$/, '').replace(/\.\d+Z$/, '');
+                        dueDate = new Date(withoutTz);
+                        if (!isNaN(dueDate.getTime())) {
+                            parsedSuccessfully = true;
+                        } 
+                        // 尝试3: 处理常见日期格式
+                        else if (task.dueDate.includes('/')) {
+                            const parts = task.dueDate.split('/');
+                            if (parts.length === 3) {
+                                dueDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                                if (!isNaN(dueDate.getTime())) {
+                                    parsedSuccessfully = true;
+                                }
+                            }
+                        }
+                        // 尝试4: 处理连字符格式
+                        else if (task.dueDate.includes('-')) {
+                            const parts = task.dueDate.split('-');
+                            if (parts.length === 3) {
+                                dueDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                                if (!isNaN(dueDate.getTime())) {
+                                    parsedSuccessfully = true;
+                                }
+                            }
+                        }
+                    }
+                    
+                    // 检查日期是否有效
+                    if (parsedSuccessfully) {
+                        const now = new Date();
+                        const isOverdue = !task.completed && dueDate < now;
+                        const isToday = dueDate.toDateString() === now.toDateString();
+                        const isTomorrow = new Date(now.getTime() + 86400000).toDateString() === dueDate.toDateString();
+                        
+                        if (isOverdue) {
+                            dueDateText = `<span class="text-danger">已逾期</span>`;
+                        } else if (isToday) {
+                            dueDateText = `<span class="text-warning">今天</span>`;
+                        } else if (isTomorrow) {
+                            dueDateText = `<span class="text-info">明天</span>`;
+                        } else {
+                            dueDateText = `<span class="text-gray-500">${dueDate.toLocaleDateString('zh-CN')}</span>`;
+                        }
                     } else {
-                        dueDateText = `<span class="text-gray-500">${dueDate.toLocaleDateString('zh-CN')}</span>`;
+                        // 如果所有解析尝试都失败，才显示"无截止日期"
+                        dueDateText = `<span class="text-gray-500">无截止日期</span>`;
                     }
                 }
 
